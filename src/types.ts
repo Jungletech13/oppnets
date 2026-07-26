@@ -731,3 +731,25 @@ export interface TrustConfigEntry {
   updated_at: string;
   created_at: string;
 }
+
+// Phase 4.2 — Verified Collaboration Engine
+
+export type VerifiedCollaborationStatus = 'pending' | 'verified' | 'insufficient_evidence' | 'invalidated';
+
+export interface VerifiedCollaboration {
+  id: ID;
+  collaboration_space_id: ID;
+  participant_one_id: ID;
+  participant_two_id: ID;
+  verification_status: VerifiedCollaborationStatus;
+  verification_reason: string;
+  started_at: string | null;
+  ended_at: string | null;
+  overlap_days: number | null;
+  evidence_snapshot: Record<string, unknown> | null;
+  calculation_version: number;
+  generated_at: string;
+  invalidated_at: string | null;
+  invalidation_reason: string | null;
+  created_at: string;
+}

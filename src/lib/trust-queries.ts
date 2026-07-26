@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import type { TrustAuditRecord, TrustEventLogEntry, TrustConfigEntry } from '@/types';
+import type { TrustAuditRecord, TrustEventLogEntry, TrustConfigEntry, VerifiedCollaboration } from '@/types';
 
 // ============ Trust Audit Records ============
 
@@ -119,4 +119,62 @@ export async function updateTrustConfig(key: string, value: unknown, description
     .maybeSingle();
   if (error) throw error;
   return data as TrustConfigEntry;
+}
+
+// ============ Verified Collaborations ============
+
+export async function fetchMyVerifiedCollaborations() {
+  const { data, error } = await supabase
+    .from('verified_collaborations')
+    .select('*')
+    .or(`participant_one_id.eq.${supabase.auth.getUserIdentity()?.id},participant_two_id.eq.${supabase.auth.getUserIdentity()?.id}`)
+    .order('generated_at', { ascending: false });
+  if (error) throw error;
+  return data as VerifiedCollaboration[];
+}
+
+export async function fetchVerifiedCollaborationsForUser(userId: string) {
+  const { data, error } = await supabase
+    .from('verified_collaborations')
+    .select('*')
+    .or(`participant_one_id.eq.${userId},participant_two_id.eq.${userId}`)
+    .order('generated_at', { ascending: false });
+  if (error) throw error;
+  return data as VerifiedCollaboration[];
+}
+
+export async function fetchVerifiedCollaborationCount(userId: string): Promise<number> {
+  const { count, error } = await supabase
+    .from('verified_collaborations')
+    .select('id', { count: 'exact', head: true })
+    .eq('verification_status', 'verified')
+    .or(`participant_one_id.eq.${userId},participant_two_id.eq.${userId}`);
+  if (error) throw error;
+  return count ?? 0;
+}
+
+export async function fetchVerifiedCollaborationsForSpace(spaceId: string) {
+  const { data, error } = await supabase
+    .from('verified_collaborations')
+    .select('*')
+    .eq('collaboration_space_id', spaceId)
+    .order('generated_at', { ascending: false });
+  if (error) throw error;
+  return data as VerifiedCollaboration[];
+}
+
+export async function adminGenerateVerifiedCollaborations(spaceId: string) {
+  const { data, error } = await supabase
+    .rpc('admin_generate_verified_collaborations', { p_space_id: spaceId });
+  if (error) throw error;
+  return data;
+}
+
+export async function adminInvalidateVerifiedCollaboration(id: string, reason: string) {
+  const { error } = await supabase
+    .rpc('admin_invalidate_verified_collaboration', {
+      p_verified_collaboration_id: id,
+      p_reason: reason,
+    });
+  if (error) throw error;
 }

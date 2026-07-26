@@ -1,9 +1,10 @@
 import { useApp } from '@/store';
 import { PageHeader } from '@/components/AppShell';
 import { Card, Avatar, TrustIndicators, VerificationPill, Badge, SectionHeader, EmptyState, Modal, Field } from '@/components/ui';
-import { MapPin, Clock, Briefcase, Heart, Target, Users, MessageSquare, ShieldAlert, Award, Rocket, Search } from 'lucide-react';
+import { MapPin, Clock, Briefcase, Heart, Target, Users, MessageSquare, ShieldAlert, Award, Rocket, Search, ShieldCheck } from 'lucide-react';
 import { getProfile, getSpace } from '@/data';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { fetchVerifiedCollaborationCount } from '@/lib/trust-queries';
 import type { Profile, VentureOutcome } from '@/types';
 
 const outcomeTone: Record<string, 'accent' | 'brand' | 'amber' | 'neutral' | 'slate'> = {
@@ -21,6 +22,16 @@ export function ProfilePage({ profileId }: { profileId?: string }) {
   const [showMessage, setShowMessage] = useState(false);
   const [showReport, setShowReport] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [verifiedCollabCount, setVerifiedCollabCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!id) return;
+    let active = true;
+    fetchVerifiedCollaborationCount(id)
+      .then((c) => { if (active) setVerifiedCollabCount(c); })
+      .catch(() => { if (active) setVerifiedCollabCount(null); });
+    return () => { active = false; };
+  }, [id]);
 
   if (!profile) return <EmptyState icon={<Users className="w-5 h-5" />} title="Profile not found" description="This profile does not exist." />;
 
@@ -222,6 +233,20 @@ export function ProfilePage({ profileId }: { profileId?: string }) {
               {profile.rolesHeld.map((r) => <Badge key={r} tone="neutral"><Award className="w-3 h-3" />{r}</Badge>)}
             </div>
           </Card>
+
+          {isMe && (
+            <Card className="p-5">
+              <SectionHeader title="Verified collaborations" />
+              <div className="flex items-center gap-3">
+                <ShieldCheck className="w-8 h-8 text-accent-500" />
+                <div>
+                  <p className="text-2xl font-bold text-ink-900">{verifiedCollabCount ?? '—'}</p>
+                  <p className="text-xs text-ink-500">confirmed shared work</p>
+                </div>
+              </div>
+              <p className="text-xs text-ink-400 mt-3">These records confirm you and another builder genuinely worked together in a collaboration space. They verify shared work happened — not the quality of the work or an endorsement.</p>
+            </Card>
+          )}
         </div>
       </div>
 

@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
-import { FolderKanban, Users, CheckSquare, Flag, Activity as ActivityIcon, FileText } from 'lucide-react';
+import { FolderKanban, Users, CheckSquare, Flag, Activity as ActivityIcon, FileText, ShieldCheck, Ban } from 'lucide-react';
 import { AdminPageHeader } from '@/components/AdminShell';
 import { Card, Badge, Modal, EmptyState } from '@/components/ui';
 import { fetchAdminSpaces, fetchSpaceOverview, type AdminSpaceRow } from '@/lib/admin-queries';
+import { fetchVerifiedCollaborationsForSpace, adminGenerateVerifiedCollaborations, adminInvalidateVerifiedCollaboration } from '@/lib/trust-queries';
+import type { VerifiedCollaboration } from '@/types';
 
 export function AdminCollaborationsPage() {
   const [spaces, setSpaces] = useState<AdminSpaceRow[]>([]);
@@ -11,6 +13,11 @@ export function AdminCollaborationsPage() {
   const [overview, setOverview] = useState<Awaited<ReturnType<typeof fetchSpaceOverview>> | null>(null);
   const [overviewLoading, setOverviewLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [verifiedCollabs, setVerifiedCollabs] = useState<VerifiedCollaboration[]>([]);
+  const [collabLoading, setCollabLoading] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [invalidatingId, setInvalidatingId] = useState<string | null>(null);
+  const [invalidateReason, setInvalidateReason] = useState('');
 
   useEffect(() => {
     (async () => {
@@ -29,13 +36,50 @@ export function AdminCollaborationsPage() {
     setSelected(space);
     setOverviewLoading(true);
     setOverview(null);
+    setVerifiedCollabs([]);
+    setCollabLoading(true);
     try {
-      const o = await fetchSpaceOverview(space.id);
+      const [o, vc] = await Promise.all([
+        fetchSpaceOverview(space.id),
+        fetchVerifiedCollaborationsForSpace(space.id),
+      ]);
       setOverview(o);
+      setVerifiedCollabs(vc);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load space overview');
     } finally {
       setOverviewLoading(false);
+      setCollabLoading(false);
+    }
+  }
+
+  async function handleGenerate() {
+    if (!selected) return;
+    setGenerating(true);
+    try {
+      await adminGenerateVerifiedCollaborations(selected.id);
+      const vc = await fetchVerifiedCollaborationsForSpace(selected.id);
+      setVerifiedCollabs(vc);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to generate verified collaborations');
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  async function handleInvalidate(id: string) {
+    if (!invalidateReason.trim()) return;
+    setInvalidatingId(id);
+    try {
+      await adminInvalidateVerifiedCollaboration(id, invalidateReason);
+      const vc = await fetchVerifiedCollaborationsForSpace(selected!.id);
+      setVerifiedCollabs(vc);
+      setInvalidateReason('');
+      setInvalidatingId(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to invalidate collaboration');
+    } finally {
+      setInvalidatingId(null);
     }
   }
 
@@ -166,6 +210,68 @@ export function AdminCollaborationsPage() {
                         <div key={a.id} className="text-sm bg-ink-50 rounded-lg px-3 py-1.5">
                           <span className="text-ink-700">{a.text}</span>
                           <span className="text-xs text-ink-400 ml-2">{a.at ? new Date(a.at).toLocaleDateString() : ''}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Verified Collaborations */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="text-sm font-semibold text-ink-700 flex items-center gap-1.5">
+                      <ShieldCheck className="w-4 h-4 text-ink-400" /> Verified Collaborations ({verifiedCollabs.length})
+                    </h4>
+                    <button
+                      onClick={handleGenerate}
+                      disabled={generating}
+                      className="btn-ghost text-xs"
+                    >
+                      {generating ? 'Generating…' : 'Generate'}
+                    </button>
+                  </div>
+                  {collabLoading ? (
+                    <p className="text-xs text-ink-400">Loading…</p>
+                  ) : verifiedCollabs.length === 0 ? (
+                    <p className="text-xs text-ink-400">No verified collaboration records. Click Generate to evaluate this space.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {verifiedCollabs.map((vc) => (
+                        <div key={vc.id} className="text-sm bg-ink-50 rounded-lg px-3 py-2">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <Badge tone={vc.verification_status === 'verified' ? 'accent' : vc.verification_status === 'invalidated' ? 'error' : 'neutral'}>
+                                {vc.verification_status.replace(/_/g, ' ')}
+                              </Badge>
+                              <span className="text-xs text-ink-500">
+                                {vc.overlap_days ?? 0}d overlap · v{vc.calculation_version}
+                              </span>
+                            </div>
+                            {vc.verification_status !== 'invalidated' && (
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="text"
+                                  placeholder="Reason"
+                                  value={invalidatingId === vc.id ? invalidateReason : ''}
+                                  onChange={(e) => { setInvalidatingId(vc.id); setInvalidateReason(e.target.value); }}
+                                  className="text-xs border border-ink-200 rounded px-2 py-1 w-32"
+                                />
+                                <button
+                                  onClick={() => handleInvalidate(vc.id)}
+                                  disabled={invalidatingId === vc.id && !invalidateReason.trim()}
+                                  className="text-xs text-red-500 hover:text-red-700 flex items-center gap-1"
+                                >
+                                  <Ban className="w-3 h-3" /> Invalidate
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                          {vc.verification_reason && (
+                            <p className="text-xs text-ink-500 mt-1">{vc.verification_reason}</p>
+                          )}
+                          {vc.invalidation_reason && (
+                            <p className="text-xs text-red-500 mt-1">Invalidated: {vc.invalidation_reason}</p>
+                          )}
                         </div>
                       ))}
                     </div>
