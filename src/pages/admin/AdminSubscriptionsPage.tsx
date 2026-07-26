@@ -137,6 +137,7 @@ function PlansTab({ plans, onError }: { plans: PlanRow[]; onError: (msg: string)
       visibility: plan.visibility,
       active: plan.active,
       sort_order: plan.sort_order,
+      approval_status: plan.approval_status,
     });
     setSaved(false);
   }
@@ -169,6 +170,7 @@ function PlansTab({ plans, onError }: { plans: PlanRow[]; onError: (msg: string)
                 <th className="text-left px-4 py-3 font-medium text-ink-600">Price</th>
                 <th className="text-left px-4 py-3 font-medium text-ink-600">Interval</th>
                 <th className="text-left px-4 py-3 font-medium text-ink-600">Visibility</th>
+                <th className="text-left px-4 py-3 font-medium text-ink-600">Approval</th>
                 <th className="text-left px-4 py-3 font-medium text-ink-600">Active</th>
                 <th className="px-4 py-3"></th>
               </tr>
@@ -185,6 +187,9 @@ function PlansTab({ plans, onError }: { plans: PlanRow[]; onError: (msg: string)
                   <td className="px-4 py-3 text-ink-600">{p.billing_interval}</td>
                   <td className="px-4 py-3">
                     <Badge tone={p.visibility === 'public' ? 'accent' : 'neutral'}>{p.visibility}</Badge>
+                  </td>
+                  <td className="px-4 py-3">
+                    <Badge tone={p.approval_status === 'founder_approved' ? 'accent' : p.approval_status === 'retired' ? 'red' : 'amber'}>{p.approval_status}</Badge>
                   </td>
                   <td className="px-4 py-3">
                     <Badge tone={p.active ? 'accent' : 'red'}>{p.active ? 'Active' : 'Inactive'}</Badge>
@@ -238,6 +243,14 @@ function PlansTab({ plans, onError }: { plans: PlanRow[]; onError: (msg: string)
                 <label className="label">Sort Order</label>
                 <input type="number" className="input" value={form.sort_order ?? 0} onChange={(e) => setForm({ ...form, sort_order: parseInt(e.target.value) || 0 })} />
               </div>
+            </div>
+            <div>
+              <label className="label">Approval Status</label>
+              <select className="input" value={form.approval_status ?? 'draft'} onChange={(e) => setForm({ ...form, approval_status: e.target.value as 'draft' | 'founder_approved' | 'retired' })}>
+                <option value="draft">Draft — Not Founder Approved</option>
+                <option value="founder_approved">Founder Approved</option>
+                <option value="retired">Retired</option>
+              </select>
             </div>
             <div className="flex items-center gap-2">
               <input type="checkbox" id="active" checked={form.active ?? true} onChange={(e) => setForm({ ...form, active: e.target.checked })} />

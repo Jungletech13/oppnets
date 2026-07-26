@@ -1,3 +1,19 @@
+/**
+ * FRONTEND ADVISORY ONLY — NOT A SECURITY BOUNDARY
+ *
+ * The EntitlementEngine is a client-side advisory layer for UI feedback only.
+ * It trusts whatever PlanEntitlements/SubscriptionPlan objects are passed to it.
+ * A malicious client can fabricate entitlement objects to bypass all checks.
+ *
+ * ALL real enforcement must occur server-side:
+ *   - Database RLS policies (gate reads/writes)
+ *   - SECURITY DEFINER database functions (gate mutations)
+ *   - Edge Functions (gate API calls)
+ *
+ * Client-supplied entitlement objects are NEVER authoritative.
+ * Do not rely on this engine for security — it is for UX only.
+ */
+
 import type {
   PlanEntitlements,
   EntitlementCheckResult,

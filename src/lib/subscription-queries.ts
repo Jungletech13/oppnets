@@ -1,5 +1,4 @@
 import { supabase } from '@/lib/supabase';
-import { logAdminAction } from '@/lib/admin-queries';
 import type {
   SubscriptionPlan,
   PlanEntitlements,
@@ -22,9 +21,10 @@ export async function fetchPublicPlans(): Promise<SubscriptionPlan[]> {
     .select('*')
     .eq('active', true)
     .eq('visibility', 'public')
+    .eq('approval_status', 'founder_approved')
     .order('sort_order', { ascending: true });
   if (error) throw error;
-  return data as SubscriptionPlan[];
+  return (data as SubscriptionPlan[]) ?? [];
 }
 
 export async function fetchAllPlans(): Promise<SubscriptionPlan[]> {
@@ -83,7 +83,8 @@ export async function fetchMySubscription(): Promise<UserSubscription | null> {
   const { data, error } = await supabase
     .from('user_subscriptions')
     .select('*')
-    .order('created_at', { ascending: false })
+    .in('status', ['free', 'trial', 'active', 'past_due'])
+    .order('started_at', { ascending: false })
     .limit(1)
     .maybeSingle();
   if (error) throw error;
@@ -117,7 +118,7 @@ export async function fetchMyPlanAndEntitlements(): Promise<{
   return { plan, entitlements, subscription: sub };
 }
 
-// ============ Admin: Plan Management ============
+// ============ Admin: Plan Management (via RPC) ============
 
 export async function adminCreatePlan(input: {
   name: string;
@@ -128,88 +129,48 @@ export async function adminCreatePlan(input: {
   plan_category: PlanCategory;
   visibility: PlanVisibility;
   sort_order: number;
+  reason?: string;
 }): Promise<SubscriptionPlan> {
-  const { data, error } = await supabase
-    .from('subscription_plans')
-    .insert({
-      name: input.name,
-      slug: input.slug,
-      description: input.description,
-      price_cents: input.price_cents,
-      billing_interval: input.billing_interval,
-      plan_category: input.plan_category,
-      visibility: input.visibility,
-      active: true,
-      sort_order: input.sort_order,
-    })
-    .select()
-    .maybeSingle();
-  if (error) throw error;
-
-  await logAdminAction({
-    action: 'plan.create',
-    target_type: 'subscription_plan',
-    target_id: data.id,
-    reason: `Created plan: ${input.name}`,
-    new_state: data,
+  const { data, error } = await supabase.rpc('admin_create_plan', {
+    p_name: input.name,
+    p_slug: input.slug,
+    p_description: input.description,
+    p_price_cents: input.price_cents,
+    p_billing_interval: input.billing_interval,
+    p_plan_category: input.plan_category,
+    p_visibility: input.visibility,
+    p_sort_order: input.sort_order,
+    p_reason: input.reason ?? '',
   });
-
+  if (error) throw error;
   return data as SubscriptionPlan;
 }
 
 export async function adminUpdatePlan(
   planId: string,
-  updates: Partial<Pick<SubscriptionPlan, 'name' | 'description' | 'price_cents' | 'billing_interval' | 'plan_category' | 'active' | 'visibility' | 'sort_order'>>
+  updates: Partial<Pick<SubscriptionPlan, 'name' | 'description' | 'price_cents' | 'billing_interval' | 'plan_category' | 'active' | 'visibility' | 'sort_order' | 'approval_status'>>
 ): Promise<void> {
-  const { data: prev } = await supabase
-    .from('subscription_plans')
-    .select('*')
-    .eq('id', planId)
-    .maybeSingle();
-
-  const { error } = await supabase
-    .from('subscription_plans')
-    .update({ ...updates, updated_at: new Date().toISOString() })
-    .eq('id', planId);
-  if (error) throw error;
-
-  await logAdminAction({
-    action: 'plan.update',
-    target_type: 'subscription_plan',
-    target_id: planId,
-    reason: `Updated plan configuration`,
-    previous_state: prev ?? null,
-    new_state: updates as Record<string, unknown>,
+  const { error } = await supabase.rpc('admin_update_plan', {
+    p_plan_id: planId,
+    p_updates: updates,
+    p_reason: 'Updated plan configuration',
   });
+  if (error) throw error;
 }
 
 export async function adminUpdateEntitlements(
   entitlementId: string,
   updates: Partial<PlanEntitlements>
 ): Promise<void> {
-  const { data: prev } = await supabase
-    .from('plan_entitlements')
-    .select('*')
-    .eq('id', entitlementId)
-    .maybeSingle();
-
-  const { error } = await supabase
-    .from('plan_entitlements')
-    .update({ ...updates, updated_at: new Date().toISOString() })
-    .eq('id', entitlementId);
-  if (error) throw error;
-
-  await logAdminAction({
-    action: 'entitlement.update',
-    target_type: 'plan_entitlements',
-    target_id: entitlementId,
-    reason: `Updated plan entitlements`,
-    previous_state: prev ?? null,
-    new_state: updates as Record<string, unknown>,
+  const { error } = await supabase.rpc('admin_update_entitlements', {
+    p_entitlement_id: entitlementId,
+    p_updates: updates,
+    p_reason: 'Updated plan entitlements',
   });
+  if (error) throw error;
 }
 
-// ============ Admin: Subscription Assignment ============
+// ============ Admin: Subscription Assignment (via RPC) ============
 
 export async function adminAssignSubscription(
   userId: string,
@@ -217,25 +178,13 @@ export async function adminAssignSubscription(
   status: SubscriptionStatus,
   reason: string
 ): Promise<void> {
-  const { data, error } = await supabase
-    .from('user_subscriptions')
-    .insert({
-      user_id: userId,
-      plan_id: planId,
-      status,
-      started_at: new Date().toISOString(),
-    })
-    .select()
-    .maybeSingle();
-  if (error) throw error;
-
-  await logAdminAction({
-    action: 'subscription.assign',
-    target_type: 'user_subscription',
-    target_id: data.id,
-    reason,
-    new_state: data,
+  const { error } = await supabase.rpc('admin_assign_subscription', {
+    p_user_id: userId,
+    p_plan_id: planId,
+    p_status: status,
+    p_reason: reason,
   });
+  if (error) throw error;
 }
 
 export async function adminUpdateSubscriptionStatus(
@@ -243,29 +192,15 @@ export async function adminUpdateSubscriptionStatus(
   status: SubscriptionStatus,
   reason: string
 ): Promise<void> {
-  const { data: prev } = await supabase
-    .from('user_subscriptions')
-    .select('*')
-    .eq('id', subscriptionId)
-    .maybeSingle();
-
-  const { error } = await supabase
-    .from('user_subscriptions')
-    .update({ status, updated_at: new Date().toISOString() })
-    .eq('id', subscriptionId);
-  if (error) throw error;
-
-  await logAdminAction({
-    action: 'subscription.status_change',
-    target_type: 'user_subscription',
-    target_id: subscriptionId,
-    reason,
-    previous_state: prev ?? null,
-    new_state: { status },
+  const { error } = await supabase.rpc('admin_update_subscription_status', {
+    p_subscription_id: subscriptionId,
+    p_status: status,
+    p_reason: reason,
   });
+  if (error) throw error;
 }
 
-// ============ Admin: Seat Management ============
+// ============ Admin: Seat Management (via RPC) ============
 
 export async function adminAssignSeat(
   companyId: string,
@@ -273,51 +208,24 @@ export async function adminAssignSeat(
   role: SeatRole,
   reason: string
 ): Promise<void> {
-  const { data, error } = await supabase
-    .from('seat_assignments')
-    .insert({
-      company_id: companyId,
-      user_id: userId,
-      role,
-      active: true,
-    })
-    .select()
-    .maybeSingle();
-  if (error) throw error;
-
-  await logAdminAction({
-    action: 'seat.assign',
-    target_type: 'seat_assignment',
-    target_id: data.id,
-    reason,
-    new_state: data,
+  const { error } = await supabase.rpc('admin_assign_seat', {
+    p_company_id: companyId,
+    p_user_id: userId,
+    p_role: role,
+    p_reason: reason,
   });
+  if (error) throw error;
 }
 
 export async function adminRemoveSeat(
   assignmentId: string,
   reason: string
 ): Promise<void> {
-  const { data: prev } = await supabase
-    .from('seat_assignments')
-    .select('*')
-    .eq('id', assignmentId)
-    .maybeSingle();
-
-  const { error } = await supabase
-    .from('seat_assignments')
-    .update({ active: false })
-    .eq('id', assignmentId);
-  if (error) throw error;
-
-  await logAdminAction({
-    action: 'seat.remove',
-    target_type: 'seat_assignment',
-    target_id: assignmentId,
-    reason,
-    previous_state: prev ?? null,
-    new_state: { active: false },
+  const { error } = await supabase.rpc('admin_remove_seat', {
+    p_assignment_id: assignmentId,
+    p_reason: reason,
   });
+  if (error) throw error;
 }
 
 export async function fetchSeatAssignments(companyId: string): Promise<SeatAssignment[]> {
@@ -341,7 +249,7 @@ export async function fetchCompanySeats(companyId: string): Promise<CompanySeatR
   return data as CompanySeatRecord | null;
 }
 
-// ============ Admin: Cost Factors ============
+// ============ Admin: Cost Factors (via RPC) ============
 
 export async function fetchCostFactors(): Promise<SubscriptionCostFactor[]> {
   const { data, error } = await supabase
@@ -358,28 +266,11 @@ export async function adminUpdateCostFactor(
   description: string,
   reason: string
 ): Promise<void> {
-  const { data: prev } = await supabase
-    .from('subscription_cost_factors')
-    .select('*')
-    .eq('id', costFactorId)
-    .maybeSingle();
-
-  const { error } = await supabase
-    .from('subscription_cost_factors')
-    .update({
-      monthly_cost_cents: monthlyCostCents,
-      description,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', costFactorId);
-  if (error) throw error;
-
-  await logAdminAction({
-    action: 'cost_factor.update',
-    target_type: 'subscription_cost_factor',
-    target_id: costFactorId,
-    reason,
-    previous_state: prev ?? null,
-    new_state: { monthly_cost_cents: monthlyCostCents, description },
+  const { error } = await supabase.rpc('admin_update_cost_factor', {
+    p_cost_factor_id: costFactorId,
+    p_monthly_cost_cents: monthlyCostCents,
+    p_description: description,
+    p_reason: reason,
   });
+  if (error) throw error;
 }

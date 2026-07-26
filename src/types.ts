@@ -604,6 +604,7 @@ export type PlanVisibility = 'public' | 'hidden';
 export type SubscriptionStatus = 'free' | 'trial' | 'active' | 'past_due' | 'cancelled' | 'expired';
 export type SeatRole = 'owner' | 'administrator' | 'recruiter' | 'manager' | 'team_member' | 'billing_manager';
 export type CostCategory = 'infrastructure' | 'ai' | 'storage' | 'email' | 'support';
+export type PlanApprovalStatus = 'draft' | 'founder_approved' | 'retired';
 
 export interface SubscriptionPlan {
   id: ID;
@@ -615,6 +616,7 @@ export interface SubscriptionPlan {
   plan_category: PlanCategory;
   active: boolean;
   visibility: PlanVisibility;
+  approval_status: PlanApprovalStatus;
   sort_order: number;
   created_at: string;
   updated_at: string;
