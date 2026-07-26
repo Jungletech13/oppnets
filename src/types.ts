@@ -694,3 +694,40 @@ export interface EntitlementCheckResult {
   limit: number;
   upgradeRecommendation?: string;
 }
+
+// Phase 4.1 — Trust Foundation
+
+export type TrustActorType = 'admin' | 'system' | 'user';
+
+export interface TrustAuditRecord {
+  id: ID;
+  actor_id: ID | null;
+  actor_type: TrustActorType;
+  decision_type: string;
+  target_type: string;
+  target_id: string;
+  reason: string;
+  previous_state: Record<string, unknown> | null;
+  new_state: Record<string, unknown> | null;
+  created_at: string;
+}
+
+export interface TrustEventLogEntry {
+  id: ID;
+  event_type: string;
+  target_type: string;
+  target_id: string;
+  user_id: ID | null;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+}
+
+export interface TrustConfigEntry {
+  id: ID;
+  key: string;
+  value: unknown;
+  description: string;
+  updated_by: ID | null;
+  updated_at: string;
+  created_at: string;
+}
