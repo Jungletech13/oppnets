@@ -244,7 +244,7 @@ export function ProfilePage({ profileId }: { profileId?: string }) {
                   <p className="text-xs text-ink-500">confirmed shared work</p>
                 </div>
               </div>
-              <p className="text-xs text-ink-400 mt-3">These records confirm you and another builder genuinely worked together in a collaboration space. They verify shared work happened — not the quality of the work or an endorsement.</p>
+              <p className="text-xs text-ink-400 mt-3">Verified collaboration confirms documented shared participation. It does not guarantee work quality, endorsement, or future performance.</p>
             </Card>
           )}
         </div>
