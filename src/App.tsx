@@ -23,11 +23,35 @@ import { PricingPage } from '@/pages/PricingPage';
 import { SuccessStoriesPage } from '@/pages/SuccessStoriesPage';
 import { ResourceCenterPage } from '@/pages/ResourceCenterPage';
 import { useAuth } from '@/lib/auth';
+import { AdminGuard } from '@/components/AdminGuard';
+import { AdminShell } from '@/components/AdminShell';
+import { AdminDashboardPage } from '@/pages/admin/AdminDashboardPage';
+import { AdminUsersPage } from '@/pages/admin/AdminUsersPage';
+import { AdminVerificationPage } from '@/pages/admin/AdminVerificationPage';
+import { AdminModerationPage } from '@/pages/admin/AdminModerationPage';
+import { AdminCollaborationsPage } from '@/pages/admin/AdminCollaborationsPage';
+import { AdminAuditPage } from '@/pages/admin/AdminAuditPage';
 
 function Router() {
   const { route } = useApp();
 
   if (route.name === 'landing') return <LandingPage />;
+
+  // Admin routes — guarded by AdminGuard, rendered in AdminShell
+  if (route.name.startsWith('admin')) {
+    return (
+      <AdminGuard>
+        <AdminShell>
+          {route.name === 'admin' && <AdminDashboardPage />}
+          {route.name === 'admin-users' && <AdminUsersPage />}
+          {route.name === 'admin-verification' && <AdminVerificationPage />}
+          {route.name === 'admin-moderation' && <AdminModerationPage />}
+          {route.name === 'admin-collaborations' && <AdminCollaborationsPage />}
+          {route.name === 'admin-audit' && <AdminAuditPage />}
+        </AdminShell>
+      </AdminGuard>
+    );
+  }
 
   return (
     <AppShell>

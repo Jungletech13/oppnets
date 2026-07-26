@@ -52,7 +52,13 @@ export type Route =
   | { name: 'pricing' }
   | { name: 'success-stories' }
   | { name: 'resources' }
-  | { name: 'resource'; slug: string };
+  | { name: 'resource'; slug: string }
+  | { name: 'admin' }
+  | { name: 'admin-users' }
+  | { name: 'admin-verification' }
+  | { name: 'admin-moderation' }
+  | { name: 'admin-collaborations' }
+  | { name: 'admin-audit' };
 
 interface AppState {
   route: Route;

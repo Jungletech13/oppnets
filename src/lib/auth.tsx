@@ -6,6 +6,7 @@ interface AuthContextValue {
   session: Session | null;
   user: User | null;
   loading: boolean;
+  isAdmin: boolean;
   signUp: (email: string, password: string) => Promise<{ error: string | null }>;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
@@ -33,6 +34,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  const isAdmin = (session?.user?.app_metadata?.role as string | undefined) === 'admin';
+
   const signUp = async (email: string, password: string) => {
     const { error } = await supabase.auth.signUp({ email, password });
     return { error: error?.message ?? null };
@@ -48,7 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ session, user: session?.user ?? null, loading, signUp, signIn, signOut }}>
+    <AuthContext.Provider value={{ session, user: session?.user ?? null, loading, isAdmin, signUp, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   );
