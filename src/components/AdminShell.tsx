@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import {
   LayoutDashboard, Users, ShieldCheck, AlertTriangle, FolderKanban, ScrollText,
-  Menu, X, ArrowLeft,
+  CreditCard, Menu, X, ArrowLeft,
 } from 'lucide-react';
 import { useApp, type Route } from '@/store';
 import { Avatar } from './ui';
@@ -14,6 +14,7 @@ const ADMIN_NAV: { label: string; route: Route; icon: typeof LayoutDashboard }[]
   { label: 'Moderation', route: { name: 'admin-moderation' }, icon: AlertTriangle },
   { label: 'Collaborations', route: { name: 'admin-collaborations' }, icon: FolderKanban },
   { label: 'Audit Log', route: { name: 'admin-audit' }, icon: ScrollText },
+  { label: 'Subscriptions', route: { name: 'admin-subscriptions' }, icon: CreditCard },
 ];
 
 export function AdminShell({ children }: { children: ReactNode }) {

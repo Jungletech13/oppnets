@@ -31,6 +31,7 @@ import { AdminVerificationPage } from '@/pages/admin/AdminVerificationPage';
 import { AdminModerationPage } from '@/pages/admin/AdminModerationPage';
 import { AdminCollaborationsPage } from '@/pages/admin/AdminCollaborationsPage';
 import { AdminAuditPage } from '@/pages/admin/AdminAuditPage';
+import { AdminSubscriptionsPage } from '@/pages/admin/AdminSubscriptionsPage';
 
 function Router() {
   const { route } = useApp();
@@ -48,6 +49,7 @@ function Router() {
           {route.name === 'admin-moderation' && <AdminModerationPage />}
           {route.name === 'admin-collaborations' && <AdminCollaborationsPage />}
           {route.name === 'admin-audit' && <AdminAuditPage />}
+          {route.name === 'admin-subscriptions' && <AdminSubscriptionsPage />}
         </AdminShell>
       </AdminGuard>
     );

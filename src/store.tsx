@@ -58,7 +58,8 @@ export type Route =
   | { name: 'admin-verification' }
   | { name: 'admin-moderation' }
   | { name: 'admin-collaborations' }
-  | { name: 'admin-audit' };
+  | { name: 'admin-audit' }
+  | { name: 'admin-subscriptions' };
 
 interface AppState {
   route: Route;

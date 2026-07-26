@@ -595,3 +595,100 @@ export interface PricingPlan {
   cta: string;
   highlighted: boolean;
 }
+
+// Phase 3.2 — Subscription Foundation
+
+export type PlanCategory = 'builder_free' | 'builder_pro' | 'professional' | 'company';
+export type BillingInterval = 'monthly' | 'yearly';
+export type PlanVisibility = 'public' | 'hidden';
+export type SubscriptionStatus = 'free' | 'trial' | 'active' | 'past_due' | 'cancelled' | 'expired';
+export type SeatRole = 'owner' | 'administrator' | 'recruiter' | 'manager' | 'team_member' | 'billing_manager';
+export type CostCategory = 'infrastructure' | 'ai' | 'storage' | 'email' | 'support';
+
+export interface SubscriptionPlan {
+  id: ID;
+  name: string;
+  slug: string;
+  description: string;
+  price_cents: number;
+  billing_interval: BillingInterval;
+  plan_category: PlanCategory;
+  active: boolean;
+  visibility: PlanVisibility;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PlanEntitlements {
+  id: ID;
+  plan_id: ID;
+  max_opportunities: number;
+  max_applications: number;
+  max_saved_items: number;
+  max_collaboration_spaces: number;
+  max_team_members: number;
+  max_messages_per_day: number;
+  storage_limit_mb: number;
+  max_professional_listings: number;
+  max_company_pages: number;
+  ai_access: boolean;
+  advanced_search: boolean;
+  analytics_access: boolean;
+  priority_visibility: boolean;
+  sponsored_listing_access: boolean;
+  recruiting_tools: boolean;
+  marketing_tools: boolean;
+  public_builder_profile: boolean;
+  seo_profile: boolean;
+}
+
+export interface UserSubscription {
+  id: ID;
+  user_id: ID;
+  plan_id: ID;
+  status: SubscriptionStatus;
+  started_at: string;
+  expires_at: string | null;
+  trial_start: string | null;
+  trial_end: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CompanySeatRecord {
+  id: ID;
+  company_id: ID;
+  subscription_id: ID;
+  included_seats: number;
+  additional_seats: number;
+  total_seats: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SeatAssignment {
+  id: ID;
+  company_id: ID;
+  user_id: ID;
+  role: SeatRole;
+  assigned_at: string;
+  active: boolean;
+}
+
+export interface SubscriptionCostFactor {
+  id: ID;
+  cost_category: CostCategory;
+  monthly_cost_cents: number;
+  description: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EntitlementCheckResult {
+  allowed: boolean;
+  reason: string;
+  currentUsage: number;
+  limit: number;
+  upgradeRecommendation?: string;
+}
