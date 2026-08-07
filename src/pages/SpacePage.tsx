@@ -267,7 +267,7 @@ function TasksTab({ space }: { space: CollaborationSpace }) {
         </div>
       )}
 
-      <NewTaskModal open={showNew} onClose={() => setShowNew(false)} space={space} onCreate={(t) => { addTask(space.id, t); setShowNew(false); }} />
+      <NewTaskModal open={showNew} onClose={() => setShowNew(false)} space={space} onCreate={async (task) => { await addTask(space.id, task); setShowNew(false); }} />
     </div>
   );
 }
@@ -318,6 +318,22 @@ function TaskDetail({ task, space, onBack }: { task: Task; space: CollaborationS
   const { currentUserId, toggleChecklistItem, toggleChecklistReview, submitForReview, reviewTask, updateTask } = useApp();
   const [showFeedback, setShowFeedback] = useState(false);
   const [comment, setComment] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const runTaskAction = async (action: () => Promise<void>) => {
+    setIsSaving(true);
+    setSaveError(null);
+    try {
+      await action();
+      return true;
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : 'Could not save this task change.');
+      return false;
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   const isOwner = task.ownerId === currentUserId;
   const isReviewer = task.reviewerId === currentUserId;
@@ -330,6 +346,12 @@ function TaskDetail({ task, space, onBack }: { task: Task; space: CollaborationS
   return (
     <div className="space-y-5">
       <button onClick={onBack} className="btn-ghost text-sm"><ArrowLeft className="w-4 h-4" /> All tasks</button>
+
+      {saveError && (
+        <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {saveError}
+        </div>
+      )}
 
       <Card className="p-5">
         <div className="flex items-start justify-between gap-3">
@@ -368,13 +390,13 @@ function TaskDetail({ task, space, onBack }: { task: Task; space: CollaborationS
         <div className="space-y-2">
           {task.checklist.map((c) => (
             <div key={c.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-ink-50">
-              <button onClick={() => (isOwner || isReviewer) && toggleChecklistItem(space.id, task.id, c.id)} disabled={!isOwner && !isReviewer}>
+              <button onClick={() => void runTaskAction(() => toggleChecklistItem(space.id, task.id, c.id))} disabled={isSaving || (!isOwner && !isReviewer)}>
                 {c.done ? <CheckCircle2 className="w-5 h-5 text-accent-500" /> : <Circle className="w-5 h-5 text-ink-300" />}
               </button>
               <span className={`text-sm flex-1 ${c.done ? 'text-ink-800 line-through' : 'text-ink-700'}`}>{c.text}</span>
               {c.submittedForReview && <Badge tone="amber">In review</Badge>}
               {c.done && isOwner && (
-                <button onClick={() => toggleChecklistReview(space.id, task.id, c.id)} className="text-xs text-brand-600 hover:underline">
+                <button onClick={() => void runTaskAction(() => toggleChecklistReview(space.id, task.id, c.id))} disabled={isSaving} className="text-xs text-brand-600 hover:underline disabled:opacity-50">
                   {c.submittedForReview ? 'Unsubmit' : 'Submit'}
                 </button>
               )}
@@ -382,7 +404,7 @@ function TaskDetail({ task, space, onBack }: { task: Task; space: CollaborationS
           ))}
         </div>
         {isOwner && canSubmit && (
-          <button onClick={() => submitForReview(space.id, task.id)} className="btn-primary mt-4">
+          <button onClick={() => void runTaskAction(() => submitForReview(space.id, task.id))} disabled={isSaving} className="btn-primary mt-4 disabled:opacity-50">
             <ShieldCheck className="w-4 h-4" /> Submit for review
           </button>
         )}
@@ -394,18 +416,18 @@ function TaskDetail({ task, space, onBack }: { task: Task; space: CollaborationS
           <SectionHeader title="Review" subtitle="You are the reviewer. Choose an action." />
           {!showFeedback ? (
             <div className="flex flex-wrap gap-2">
-              <button onClick={() => reviewTask(space.id, task.id, 'approve')} className="btn bg-accent-600 text-white hover:bg-accent-700 px-4 py-2 text-sm">
+              <button onClick={() => void runTaskAction(() => reviewTask(space.id, task.id, 'approve'))} disabled={isSaving} className="btn bg-accent-600 text-white hover:bg-accent-700 px-4 py-2 text-sm disabled:opacity-50">
                 <CheckCircle2 className="w-4 h-4" /> Approve
               </button>
               <button onClick={() => setShowFeedback(true)} className="btn bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 px-4 py-2 text-sm">
                 <AlertTriangle className="w-4 h-4" /> Request changes
               </button>
-              <button onClick={() => reviewTask(space.id, task.id, 'discussion')} className="btn bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 px-4 py-2 text-sm">
+              <button onClick={() => void runTaskAction(() => reviewTask(space.id, task.id, 'discussion'))} disabled={isSaving} className="btn bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 px-4 py-2 text-sm disabled:opacity-50">
                 <MessageSquare className="w-4 h-4" /> Needs discussion
               </button>
             </div>
           ) : (
-            <FeedbackForm onSubmit={(fb) => { reviewTask(space.id, task.id, 'changes', fb); setShowFeedback(false); }} onCancel={() => setShowFeedback(false)} />
+            <FeedbackForm onSubmit={(fb) => { void runTaskAction(() => reviewTask(space.id, task.id, 'changes', fb)).then((saved) => saved && setShowFeedback(false)); }} onCancel={() => setShowFeedback(false)} />
           )}
         </Card>
       )}
@@ -420,7 +442,7 @@ function TaskDetail({ task, space, onBack }: { task: Task; space: CollaborationS
             <div><span className="text-ink-500">Required:</span> <Badge tone={task.feedback.required ? 'red' : 'neutral'}>{task.feedback.required ? 'Required' : 'Optional'}</Badge></div>
             {task.feedback.comments && <div><span className="text-ink-500">Comments:</span> <span className="text-ink-800">{task.feedback.comments}</span></div>}
           </div>
-          {isOwner && <button onClick={() => updateTask(space.id, task.id, (t) => ({ ...t, status: 'In progress' }))} className="btn-primary mt-4">Revise & resubmit</button>}
+          {isOwner && <button onClick={() => void runTaskAction(() => updateTask(space.id, task.id, (t) => ({ ...t, status: 'In progress' })))} disabled={isSaving} className="btn-primary mt-4 disabled:opacity-50">Revise & resubmit</button>}
         </Card>
       )}
 
@@ -491,7 +513,7 @@ function FeedbackForm({ onSubmit, onCancel }: { onSubmit: (fb: { reviewerId: str
   );
 }
 
-function NewTaskModal({ open, onClose, space, onCreate }: { open: boolean; onClose: () => void; space: CollaborationSpace; onCreate: (t: Task) => void }) {
+function NewTaskModal({ open, onClose, space, onCreate }: { open: boolean; onClose: () => void; space: CollaborationSpace; onCreate: (t: Task) => Promise<void> }) {
   const { currentUserId } = useApp();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -500,8 +522,10 @@ function NewTaskModal({ open, onClose, space, onCreate }: { open: boolean; onClo
   const [dueDate, setDueDate] = useState('');
   const [priority, setPriority] = useState<'Low' | 'Medium' | 'High'>('Medium');
   const [checklist, setChecklist] = useState<string[]>(['']);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const create = () => {
+  const create = async () => {
     const task: Task = {
       id: `t-${Date.now()}`, title, description, ownerId, reviewerId,
       dueDate: dueDate || new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10),
@@ -509,8 +533,16 @@ function NewTaskModal({ open, onClose, space, onCreate }: { open: boolean; onClo
       checklist: checklist.filter(Boolean).map((t, i) => ({ id: `c-${Date.now()}-${i}`, text: t, done: false })),
       dependencies: [], comments: [], revisions: [],
     };
-    onCreate(task);
-    setTitle(''); setDescription(''); setChecklist(['']);
+    setSaving(true);
+    setError(null);
+    try {
+      await onCreate(task);
+      setTitle(''); setDescription(''); setChecklist(['']);
+    } catch (createError) {
+      setError(createError instanceof Error ? createError.message : 'Could not create this task.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -537,9 +569,10 @@ function NewTaskModal({ open, onClose, space, onCreate }: { open: boolean; onClo
             <button onClick={() => setChecklist([...checklist, ''])} className="btn-ghost text-sm"><Plus className="w-4 h-4" /> Add item</button>
           </div>
         </Field>
+        {error && <p className="text-sm text-red-600" role="alert">{error}</p>}
         <div className="flex justify-end gap-2">
           <button onClick={onClose} className="btn-secondary">Cancel</button>
-          <button onClick={create} className="btn-primary" disabled={!title}>Create task</button>
+          <button onClick={create} className="btn-primary" disabled={!title || saving}>{saving ? 'Creating...' : 'Create task'}</button>
         </div>
       </div>
     </Modal>

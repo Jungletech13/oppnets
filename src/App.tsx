@@ -34,7 +34,23 @@ import { AdminAuditPage } from '@/pages/admin/AdminAuditPage';
 import { AdminSubscriptionsPage } from '@/pages/admin/AdminSubscriptionsPage';
 
 function Router() {
-  const { route } = useApp();
+  const { route, dataLoading, dataError, retryDataLoad } = useApp();
+
+  if (dataLoading) {
+    return <div className="min-h-screen flex items-center justify-center bg-ink-50 text-sm text-ink-500">Loading your OppNets workspace...</div>;
+  }
+
+  if (dataError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-ink-50 p-6">
+        <div className="card max-w-md p-6 text-center">
+          <h1 className="font-semibold text-ink-900">We could not load your workspace</h1>
+          <p className="text-sm text-ink-500 mt-2">{dataError}</p>
+          <button onClick={retryDataLoad} className="btn-primary mt-4">Try again</button>
+        </div>
+      </div>
+    );
+  }
 
   if (route.name === 'landing') return <LandingPage />;
 

@@ -13,7 +13,9 @@ export type Industry =
   | 'Finance'
   | 'Consulting'
   | 'Community'
-  | 'Creative';
+  | 'Creative'
+  | 'Construction'
+  | 'Healthcare';
 
 export type OpportunityStage =
   | 'Idea'

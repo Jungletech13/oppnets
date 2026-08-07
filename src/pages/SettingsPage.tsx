@@ -75,7 +75,7 @@ export function SettingsPage() {
 
         <Card className="p-5">
           <SectionHeader title="About this prototype" />
-          <p className="text-sm text-ink-500">This is an MVP prototype with mock data. Authentication, real-time messaging, file storage, and verification are simulated. No real account changes are persisted.</p>
+          <p className="text-sm text-ink-500">This MVP now persists authenticated profiles, opportunities, collaboration spaces, and task review workflows in Supabase. Messaging, notifications, file storage, trust verification, and some workspace tools remain simulated.</p>
         </Card>
       </div>
     </div>

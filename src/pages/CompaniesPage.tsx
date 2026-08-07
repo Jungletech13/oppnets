@@ -6,7 +6,7 @@ import { Search, MapPin, Star, ShieldCheck, Building2, Plus, Bookmark, BookmarkC
 import { COMPANIES as DEMO_COMPANIES } from '@/data-phase2';
 import { fetchCompanies, createCompany, toggleSavedListing, isListingSaved } from '@/lib/queries';
 import { useAuth } from '@/lib/auth';
-import type { Company, CompanySize } from '@/types';
+import type { Company, CompanySize, Industry } from '@/types';
 
 const SIZES: (CompanySize | 'All')[] = ['All', '1-10', '11-50', '51-200', '201-500', '500+'];
 
@@ -38,7 +38,7 @@ export function CompaniesPage() {
         description: (r.description as string) || '',
         mission: (r.mission as string) || '',
         services: (r.services as string[]) || [],
-        industries: (r.industries as string[]) || [],
+        industries: (r.industries as Industry[]) || [],
         size: (r.size as CompanySize) || '1-10',
         location: (r.location as string) || '',
         website: (r.website as string) || '',
