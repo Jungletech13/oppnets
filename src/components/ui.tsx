@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import type { VerificationClaim } from '@/types';
-import { CheckCircle2, Clock, AlertTriangle, XCircle, ShieldCheck, ShieldAlert, Sparkles } from 'lucide-react';
+import { CheckCircle2, Clock, AlertTriangle, XCircle, ShieldCheck, Sparkles } from 'lucide-react';
 
 export function ProgressBar({ value, className = '', showLabel = false }: { value: number; className?: string; showLabel?: boolean }) {
   const v = Math.max(0, Math.min(100, value));
@@ -152,10 +152,10 @@ export function Modal({ open, onClose, title, children, wide = false }: { open: 
   );
 }
 
-export function Field({ label, children, hint }: { label: string; children: ReactNode; hint?: string }) {
+export function Field({ label, children, hint, required = false }: { label: string; children: ReactNode; hint?: string; required?: boolean }) {
   return (
     <div>
-      <label className="label">{label}</label>
+      <label className="label">{label}{required && <span className="text-red-500"> *</span>}</label>
       {children}
       {hint && <p className="text-xs text-ink-400 mt-1">{hint}</p>}
     </div>

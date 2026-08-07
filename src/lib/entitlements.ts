@@ -59,7 +59,7 @@ export class EntitlementEngine {
         reason: `${featureName} is not available on your current plan.`,
         currentUsage,
         limit: 0,
-        upgradeRecommendation: this.upgradeSuggestion(featureName),
+        upgradeRecommendation: this.upgradeSuggestion(),
       };
     }
     if (currentUsage >= limit) {
@@ -68,7 +68,7 @@ export class EntitlementEngine {
         reason: `You have reached your ${featureName} limit (${currentUsage}/${limit}).`,
         currentUsage,
         limit,
-        upgradeRecommendation: this.upgradeSuggestion(featureName),
+        upgradeRecommendation: this.upgradeSuggestion(),
       };
     }
     return {
@@ -85,11 +85,11 @@ export class EntitlementEngine {
       reason: flag ? '' : `${featureName} is not available on your current plan.`,
       currentUsage: 0,
       limit: flag ? 1 : 0,
-      upgradeRecommendation: flag ? undefined : this.upgradeSuggestion(featureName),
+      upgradeRecommendation: flag ? undefined : this.upgradeSuggestion(),
     };
   }
 
-  private upgradeSuggestion(featureName: string): string | undefined {
+  private upgradeSuggestion(): string | undefined {
     if (!this.plan) return 'Upgrade to a paid plan to access this feature.';
     const cat = this.plan.plan_category;
     if (cat === 'builder_free') return 'Upgrade to Builder Pro to access this feature.';
