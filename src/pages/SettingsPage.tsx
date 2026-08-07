@@ -1,26 +1,48 @@
+Exit code: 0
+Wall time: 0.6 seconds
+Output:
+import { useEffect, useState } from 'react';
+import { Bell, CreditCard, LogOut, Shield } from 'lucide-react';
 import { useApp } from '@/store';
 import { PageHeader } from '@/components/AppShell';
-import { Card, SectionHeader, Field, Badge } from '@/components/ui';
-import { Bell, Shield, Globe, User, LogOut, CreditCard } from 'lucide-react';
-import { useState } from 'react';
+import { Badge, Card, Field, SectionHeader } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { useMembership } from '@/lib/use-membership';
 
-type NotifKey = 'reviews' | 'messages' | 'checkIns' | 'weekly';
-
 export function SettingsPage() {
   const { currentUserId, profiles, updateProfile, navigate } = useApp();
-  const { signOut } = useAuth();
+  const { user, signOut } = useAuth();
   const { plan, subscription, loading: membershipLoading, error: membershipError } = useMembership();
-  const me = profiles.find((p) => p.id === currentUserId)!;
-  const [notif, setNotif] = useState<Record<NotifKey, boolean>>({ reviews: true, messages: true, checkIns: true, weekly: false });
-  const [visibility, setVisibility] = useState('public');
+  const me = profiles.find((profile) => profile.id === currentUserId);
+  const [name, setName] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
 
-  const toggle = (key: NotifKey) => setNotif((prev) => ({ ...prev, [key]: !prev[key] }));
+  useEffect(() => {
+    if (me) setName(me.name);
+  }, [me]);
+
+  const saveAccount = async () => {
+    if (!me || !name.trim()) {
+      setSaveMessage({ tone: 'error', text: 'Enter your name before saving.' });
+      return;
+    }
+
+    setSaving(true);
+    setSaveMessage(null);
+    try {
+      await updateProfile({ ...me, name: name.trim() });
+      setSaveMessage({ tone: 'success', text: 'Account name saved.' });
+    } catch (error) {
+      setSaveMessage({ tone: 'error', text: error instanceof Error ? error.message : 'Could not save your account name.' });
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div className="max-w-2xl">
-      <PageHeader title="Settings" subtitle="Account, notifications, and privacy." />
+      <PageHeader title="Settings" subtitle="Account, membership, notifications, and privacy." />
 
       <div className="space-y-6">
         <Card className="p-5">
@@ -54,47 +76,44 @@ export function SettingsPage() {
         </Card>
 
         <Card className="p-5">
-          <SectionHeader title="Profile visibility" />
-          <div className="space-y-2">
-            {[
-              { v: 'public', label: 'Public â€” visible to anyone', icon: Globe },
-              { v: 'network', label: 'Network only â€” visible to connected users', icon: User },
-              { v: 'private', label: 'Private â€” visible only to you', icon: Shield },
-            ].map((opt) => (
-              <button key={opt.v} onClick={() => setVisibility(opt.v)} className={`w-full text-left p-3 rounded-lg border flex items-center gap-3 ${visibility === opt.v ? 'border-brand-500 bg-brand-50' : 'border-ink-200'}`}>
-                <opt.icon className={`w-4 h-4 ${visibility === opt.v ? 'text-brand-600' : 'text-ink-400'}`} />
-                <span className="text-sm text-ink-700">{opt.label}</span>
-                {visibility === opt.v && <Badge tone="brand">Selected</Badge>}
+          <SectionHeader title="Account" />
+          <div className="space-y-3">
+            <Field label="Name">
+              <input className="input" value={name} onChange={(event) => setName(event.target.value)} disabled={!me || saving} />
+            </Field>
+            <Field label="Sign-in email">
+              <input className="input" value={user?.email ?? ''} readOnly disabled />
+            </Field>
+            <div className="flex items-center gap-3">
+              <button onClick={saveAccount} disabled={!me || saving || !name.trim()} className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed">
+                {saving ? 'Saving...' : 'Save changes'}
               </button>
-            ))}
+              {saveMessage && (
+                <p role="status" className={`text-sm ${saveMessage.tone === 'success' ? 'text-green-700' : 'text-red-600'}`}>{saveMessage.text}</p>
+              )}
+            </div>
+          </div>
+        </Card>
+
+        <Card className="p-5">
+          <SectionHeader title="Profile visibility" />
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 flex items-start gap-3">
+            <Shield className="w-5 h-5 text-amber-700 mt-0.5" />
+            <div>
+              <p className="text-sm font-medium text-amber-900">Visibility controls are coming soon</p>
+              <p className="text-sm text-amber-800 mt-1">Profiles currently use the platform's standard visibility. Private and network-only modes will appear here after database access rules enforce them.</p>
+            </div>
           </div>
         </Card>
 
         <Card className="p-5">
           <SectionHeader title="Notifications" />
-          <div className="space-y-3">
-            {([
-              { key: 'reviews', label: 'Review requests and approvals' },
-              { key: 'messages', label: 'New messages' },
-              { key: 'checkIns', label: 'Partnership check-in reminders' },
-              { key: 'weekly', label: 'Weekly progress summary' },
-            ] as { key: NotifKey; label: string }[]).map((n) => (
-              <label key={n.key} className="flex items-center justify-between cursor-pointer">
-                <span className="text-sm text-ink-700">{n.label}</span>
-                <button onClick={() => toggle(n.key)} className={`relative w-10 h-6 rounded-full transition-colors ${notif[n.key] ? 'bg-brand-600' : 'bg-ink-200'}`}>
-                  <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform ${notif[n.key] ? 'translate-x-4' : 'translate-x-0.5'}`} />
-                </button>
-              </label>
-            ))}
-          </div>
-        </Card>
-
-        <Card className="p-5">
-          <SectionHeader title="Account" />
-          <div className="space-y-3">
-            <Field label="Name"><input className="input" defaultValue={me.name} /></Field>
-            <Field label="Email"><input className="input" defaultValue="demo@opportunitynetwork.app" disabled /></Field>
-            <button onClick={() => updateProfile({ ...me, name: me.name })} className="btn-primary">Save changes</button>
+          <div className="rounded-lg border border-ink-200 bg-ink-50 p-4 flex items-start gap-3">
+            <Bell className="w-5 h-5 text-ink-500 mt-0.5" />
+            <div>
+              <p className="text-sm font-medium text-ink-800">Notification preferences are coming soon</p>
+              <p className="text-sm text-ink-600 mt-1">Your choices will be available after email and in-app delivery preferences are connected to your account.</p>
+            </div>
           </div>
         </Card>
 
