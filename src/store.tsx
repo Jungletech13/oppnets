@@ -1,5 +1,5 @@
 Exit code: 0
-Wall time: 0.8 seconds
+Wall time: 1 seconds
 Output:
 import { createContext, useContext, useState, useCallback, useEffect, useMemo, type ReactNode } from 'react';
 import type {
@@ -40,6 +40,10 @@ import {
   sendMessage as persistMessage,
   markNotificationRead as persistNotificationRead,
   markAllNotificationsRead as persistAllNotificationsRead,
+  fetchUserReports,
+  fetchUserAppeals,
+  submitUserReport,
+  submitModerationAppeal,
   updatePersistedTask,
   updateProfile as persistProfile,
 } from '@/lib/queries';
@@ -147,8 +151,9 @@ interface AppState {
   markNotificationRead: (id: ID) => Promise<void>;
   markAllNotificationsRead: () => Promise<void>;
   updateProfile: (p: Profile) => Promise<void>;
-  reportUser: (targetId: ID, reason: string) => void;
-  reportOpportunity: (targetId: ID, reason: string) => void;
+  reportUser: (targetId: ID, reason: string) => Promise<void>;
+  reportOpportunity: (targetId: ID, reason: string) => Promise<void>;
+  submitAppeal: (decision: string, reason: string) => Promise<void>;
 }
 
 const Ctx = createContext<AppState | null>(null);
@@ -161,6 +166,15 @@ export function useApp() {
 
 const uid = (p: string) => `${p}-${Math.random().toString(36).slice(2, 9)}`;
 const nowISO = () => new Date().toISOString();
+const reportStatus = (status: string): import('./types').Report['status'] => {
+  const labels: Record<string, import('./types').Report['status']> = {
+    submitted: 'Submitted',
+    under_review: 'Under review',
+    resolved: 'Resolved',
+    dismissed: 'Dismissed',
+  };
+  return labels[status] ?? 'Submitted';
+};
 
 function taskProgress(t: Task): { done: number; total: number; pct: number; approvedPct: number } {
   const total = t.checklist.length;
@@ -193,14 +207,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
     let active = true;
     setDataLoading(true);
     setDataError(null);
-    Promise.all([fetchProfiles(), fetchOpportunities(), fetchUserSpacesWithDetails(user.id), fetchConversations(user.id), fetchNotifications(user.id)])
-      .then(([profileRows, opportunityRows, spaceRows, conversationRows, notificationRows]) => {
+    Promise.all([fetchProfiles(), fetchOpportunities(), fetchUserSpacesWithDetails(user.id), fetchConversations(user.id), fetchNotifications(user.id), fetchUserReports(user.id), fetchUserAppeals(user.id)])
+      .then(([profileRows, opportunityRows, spaceRows, conversationRows, notificationRows, reportRows, appealRows]) => {
         if (!active) return;
         setProfiles((profileRows || []).map((row) => mapProfileRow(row as Record<string, unknown>)));
         setOpportunities((opportunityRows || []).map((row) => mapOpportunityRow(row as Record<string, unknown>)));
         setSpaces((spaceRows || []).filter(Boolean).map((row) => mapSpaceRow(row as Record<string, unknown>)));
         setConversations((conversationRows || []).map((row) => mapConversationRow(row as Record<string, unknown>)));
         setNotifications((notificationRows || []).map((row) => mapNotificationRow(row as Record<string, unknown>)));
+        setTrust((current) => ({
+          ...current,
+          reports: (reportRows || []).map((row) => ({
+            id: row.id as string,
+            targetType: row.target_type as 'user' | 'opportunity',
+            targetId: row.target_id as string,
+            reason: row.reason as string,
+            status: reportStatus(row.status as string),
+            at: row.created_at as string,
+          })),
+          appealStatus: appealRows?.[0] ? reportStatus(appealRows[0].status as string) : undefined,
+        }));
       })
       .catch((error: unknown) => {
         if (!active) return;
@@ -388,18 +414,25 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setProfiles((prev) => prev.map((x) => (x.id === p.id ? p : x)));
   }, []);
 
-  const reportUser = useCallback((targetId: ID, reason: string) => {
+  const reportUser = useCallback(async (targetId: ID, reason: string) => {
+    const row = await submitUserReport('user', targetId, reason);
     setTrust((prev) => ({
       ...prev,
-      reports: [...prev.reports, { id: uid('rep'), targetType: 'user', targetId, reason, status: 'Submitted', at: nowISO() }],
+      reports: [{ id: row.id as string, targetType: 'user', targetId, reason: row.reason as string, status: reportStatus(row.status as string), at: row.created_at as string }, ...prev.reports],
     }));
   }, []);
 
-  const reportOpportunity = useCallback((targetId: ID, reason: string) => {
+  const reportOpportunity = useCallback(async (targetId: ID, reason: string) => {
+    const row = await submitUserReport('opportunity', targetId, reason);
     setTrust((prev) => ({
       ...prev,
-      reports: [...prev.reports, { id: uid('rep'), targetType: 'opportunity', targetId, reason, status: 'Submitted', at: nowISO() }],
+      reports: [{ id: row.id as string, targetType: 'opportunity', targetId, reason: row.reason as string, status: reportStatus(row.status as string), at: row.created_at as string }, ...prev.reports],
     }));
+  }, []);
+
+  const submitAppeal = useCallback(async (decision: string, reason: string) => {
+    const row = await submitModerationAppeal(decision, reason);
+    setTrust((prev) => ({ ...prev, appealStatus: reportStatus(row.status as string) }));
   }, []);
 
   const value = useMemo<AppState>(
@@ -409,14 +442,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
       createOpportunity, createSpaceFromOpportunity, updateSpace, addTask, updateTask, submitForReview, reviewTask,
       toggleChecklistItem, toggleChecklistReview, updateModules, addMilestone, toggleMilestone, addDecision, addCheckIn,
       setCheckInFrequency, acknowledgeRecord, sendMessage, startConversation, markNotificationRead, markAllNotificationsRead,
-      updateProfile, reportUser, reportOpportunity,
+      updateProfile, reportUser, reportOpportunity, submitAppeal,
     }),
     [route, navigate, currentUserId, profiles, groups, opportunities, spaces, conversations, notifications, trust,
      dataLoading, dataError, retryDataLoad,
      createOpportunity, createSpaceFromOpportunity, updateSpace, addTask, updateTask, submitForReview, reviewTask,
      toggleChecklistItem, toggleChecklistReview, updateModules, addMilestone, toggleMilestone, addDecision, addCheckIn,
      setCheckInFrequency, acknowledgeRecord, sendMessage, startConversation, markNotificationRead, markAllNotificationsRead,
-     updateProfile, reportUser, reportOpportunity]
+     updateProfile, reportUser, reportOpportunity, submitAppeal]
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
