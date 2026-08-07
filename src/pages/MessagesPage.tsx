@@ -1,22 +1,29 @@
-import { useState } from 'react';
+Exit code: 0
+Wall time: 0.9 seconds
+Output:
+import { useEffect, useState } from 'react';
 import { useApp } from '@/store';
 import { PageHeader } from '@/components/AppShell';
 import { Card, Avatar, EmptyState, Badge } from '@/components/ui';
 import { MessageSquare, Send, Users, ListChecks, Gavel, FileText, ClipboardList, CheckCircle2, Circle } from 'lucide-react';
-import { getProfile } from '@/data';
-import type { Conversation } from '@/types';
 
 export function MessagesPage() {
-  const { conversations, currentUserId, sendMessage, navigate, spaces } = useApp();
+  const { conversations, currentUserId, sendMessage, navigate, spaces, profiles } = useApp();
   const [activeId, setActiveId] = useState<string>(conversations[0]?.id ?? '');
   const [text, setText] = useState('');
+  const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
 
   const active = conversations.find((c) => c.id === activeId);
   const activeSpace = active?.spaceId ? spaces.find((s) => s.id === active.spaceId) : undefined;
 
+  useEffect(() => {
+    if (!activeId && conversations[0]) setActiveId(conversations[0].id);
+  }, [activeId, conversations]);
+
   return (
     <div>
-      <PageHeader title="Messages" subtitle="Conversations tied to projects, tasks, and decisions — not generic chat." />
+      <PageHeader title="Messages" subtitle="Conversations tied to projects, tasks, and decisions â€” not generic chat." />
       <div className="grid lg:grid-cols-3 gap-4" style={{ minHeight: 500 }}>
         {/* List */}
         <Card className="p-2 lg:col-span-1">
@@ -24,7 +31,7 @@ export function MessagesPage() {
             <div className="space-y-0.5">
               {conversations.map((c) => {
                 const last = c.messages[c.messages.length - 1];
-                const others = c.participantIds.filter((id) => id !== currentUserId).map((id) => getProfile(id)).filter(Boolean);
+                const others = c.participantIds.filter((id) => id !== currentUserId).map((id) => profiles.find((profile) => profile.id === id)).filter(Boolean);
                 const isSpace = c.type === 'space';
                 return (
                   <button key={c.id} onClick={() => setActiveId(c.id)} className={`w-full text-left p-2.5 rounded-lg flex items-center gap-2.5 ${activeId === c.id ? 'bg-brand-50' : 'hover:bg-ink-50'}`}>
@@ -62,13 +69,13 @@ export function MessagesPage() {
               <div className="flex-1 overflow-y-auto p-4 space-y-3" style={{ maxHeight: 400 }}>
                 {active.messages.length === 0 && <p className="text-sm text-ink-500 text-center py-8">No messages yet.</p>}
                 {active.messages.map((m) => {
-                  const author = getProfile(m.authorId);
+                  const author = profiles.find((profile) => profile.id === m.authorId);
                   const isMe = m.authorId === currentUserId;
                   return (
                     <div key={m.id} className={`flex items-start gap-2 ${isMe ? 'flex-row-reverse' : ''}`}>
                       {author && <Avatar src={author.photoUrl} name={author.name} size={28} />}
                       <div className={`max-w-[70%] ${isMe ? 'text-right' : ''}`}>
-                        <p className="text-xs text-ink-400 mb-0.5">{author?.name?.split(' ')[0]} · {new Date(m.at).toLocaleDateString()}</p>
+                        <p className="text-xs text-ink-400 mb-0.5">{author?.name?.split(' ')[0]} Â· {new Date(m.at).toLocaleDateString()}</p>
                         <div className={`inline-block rounded-lg px-3 py-2 text-sm ${isMe ? 'bg-brand-600 text-white' : 'bg-ink-100 text-ink-800'}`}>{m.text}</div>
                       </div>
                     </div>
@@ -80,15 +87,36 @@ export function MessagesPage() {
               {activeSpace && <ActionItemsBar space={activeSpace} currentUserId={currentUserId} />}
 
               <div className="p-3 border-t border-ink-100 flex gap-2">
-                <input className="input flex-1" placeholder="Type a message..." value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && text) { sendMessage(active.id, text); setText(''); } }} />
-                <button onClick={() => { if (text) { sendMessage(active.id, text); setText(''); } }} className="btn-primary"><Send className="w-4 h-4" /></button>
+                <input className="input flex-1" placeholder="Type a message..." value={text} disabled={sending} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && text.trim() && !sending) void submitMessage(active.id, text, sendMessage, setText, setSending, setSendError); }} />
+                <button disabled={sending || !text.trim()} onClick={() => void submitMessage(active.id, text, sendMessage, setText, setSending, setSendError)} className="btn-primary disabled:opacity-50"><Send className="w-4 h-4" /></button>
               </div>
+              {sendError && <p role="alert" className="px-3 pb-3 text-sm text-red-600">{sendError}</p>}
             </>
           )}
         </Card>
       </div>
     </div>
   );
+}
+
+async function submitMessage(
+  conversationId: string,
+  text: string,
+  sendMessage: (conversationId: string, text: string) => Promise<void>,
+  setText: (value: string) => void,
+  setSending: (value: boolean) => void,
+  setError: (value: string | null) => void,
+) {
+  setSending(true);
+  setError(null);
+  try {
+    await sendMessage(conversationId, text);
+    setText('');
+  } catch (error) {
+    setError(error instanceof Error ? error.message : 'Could not send the message.');
+  } finally {
+    setSending(false);
+  }
 }
 
 function CollaborationContextBar({ space, currentUserId, navigate }: { space: import('@/types').CollaborationSpace; currentUserId: string; navigate: (r: { name: 'space'; spaceId: string }) => void }) {
@@ -140,4 +168,5 @@ function ActionItemsBar({ space, currentUserId }: { space: import('@/types').Col
     </div>
   );
 }
+
 
