@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, useMemo, type ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, useMemo, type ReactNode } from 'react';
 import type {
   Profile,
   Opportunity,
@@ -20,14 +20,20 @@ import type {
   TrustState,
 } from './types';
 import {
-  PROFILES,
   GROUPS,
-  OPPORTUNITIES,
   SPACES,
   CONVERSATIONS,
   NOTIFICATIONS,
   MY_TRUST,
 } from './data';
+import { useAuth } from '@/lib/auth';
+import {
+  createOpportunity as persistOpportunity,
+  fetchOpportunities,
+  fetchProfiles,
+  updateProfile as persistProfile,
+} from '@/lib/queries';
+import { mapOpportunityRow, mapProfileRow, profileToUpdate } from '@/lib/domain-mappers';
 
 export type Route =
   | { name: 'landing' }
@@ -72,8 +78,11 @@ interface AppState {
   conversations: Conversation[];
   notifications: AppNotification[];
   trust: TrustState;
+  dataLoading: boolean;
+  dataError: string | null;
+  retryDataLoad: () => void;
   // actions
-  createOpportunity: (o: Opportunity) => void;
+  createOpportunity: (o: Opportunity) => Promise<Opportunity>;
   createSpaceFromOpportunity: (oppId: ID, name: string, description: string, memberIds: ID[]) => ID;
   updateSpace: (spaceId: ID, updater: (s: CollaborationSpace) => CollaborationSpace) => void;
   addTask: (spaceId: ID, task: Task) => void;
@@ -93,7 +102,7 @@ interface AppState {
   startConversation: (participantIds: ID[], title: string, type?: Conversation['type'], spaceId?: ID) => ID;
   markNotificationRead: (id: ID) => void;
   markAllNotificationsRead: () => void;
-  updateProfile: (p: Profile) => void;
+  updateProfile: (p: Profile) => Promise<void>;
   reportUser: (targetId: ID, reason: string) => void;
   reportOpportunity: (targetId: ID, reason: string) => void;
 }
@@ -121,23 +130,52 @@ function taskProgress(t: Task): { done: number; total: number; pct: number; appr
 export { taskProgress };
 
 export function AppProvider({ children }: { children: ReactNode }) {
+  const { user } = useAuth();
   const [route, setRoute] = useState<Route>({ name: 'landing' });
-  const [profiles, setProfiles] = useState<Profile[]>(PROFILES);
+  const [profiles, setProfiles] = useState<Profile[]>([]);
   const [groups] = useState<CollaborationGroup[]>(GROUPS);
-  const [opportunities, setOpportunities] = useState<Opportunity[]>(OPPORTUNITIES);
+  const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [spaces, setSpaces] = useState<CollaborationSpace[]>(SPACES);
   const [conversations, setConversations] = useState<Conversation[]>(CONVERSATIONS);
   const [notifications, setNotifications] = useState<AppNotification[]>(NOTIFICATIONS);
   const [trust, setTrust] = useState<TrustState>(MY_TRUST);
-  const currentUserId = 'p-me';
+  const [dataLoading, setDataLoading] = useState(true);
+  const [dataError, setDataError] = useState<string | null>(null);
+  const [loadVersion, setLoadVersion] = useState(0);
+  const currentUserId = user?.id ?? '';
+
+  useEffect(() => {
+    if (!user) return;
+    let active = true;
+    setDataLoading(true);
+    setDataError(null);
+    Promise.all([fetchProfiles(), fetchOpportunities()])
+      .then(([profileRows, opportunityRows]) => {
+        if (!active) return;
+        setProfiles((profileRows || []).map((row) => mapProfileRow(row as Record<string, unknown>)));
+        setOpportunities((opportunityRows || []).map((row) => mapOpportunityRow(row as Record<string, unknown>)));
+      })
+      .catch((error: unknown) => {
+        if (!active) return;
+        setDataError(error instanceof Error ? error.message : 'Could not load your OppNets data.');
+      })
+      .finally(() => {
+        if (active) setDataLoading(false);
+      });
+    return () => { active = false; };
+  }, [user, loadVersion]);
+
+  const retryDataLoad = useCallback(() => setLoadVersion((version) => version + 1), []);
 
   const navigate = useCallback((r: Route) => {
     setRoute(r);
     window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
   }, []);
 
-  const createOpportunity = useCallback((o: Opportunity) => {
-    setOpportunities((prev) => [o, ...prev]);
+  const createOpportunity = useCallback(async (o: Opportunity) => {
+    const persisted = await persistOpportunity(o);
+    setOpportunities((prev) => [persisted, ...prev]);
+    return persisted;
   }, []);
 
   const createSpaceFromOpportunity = useCallback(
@@ -344,7 +382,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
   }, []);
 
-  const updateProfile = useCallback((p: Profile) => {
+  const updateProfile = useCallback(async (p: Profile) => {
+    await persistProfile(p.id, profileToUpdate(p));
     setProfiles((prev) => prev.map((x) => (x.id === p.id ? p : x)));
   }, []);
 
@@ -365,12 +404,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const value = useMemo<AppState>(
     () => ({
       route, navigate, currentUserId, profiles, groups, opportunities, spaces, conversations, notifications, trust,
+      dataLoading, dataError, retryDataLoad,
       createOpportunity, createSpaceFromOpportunity, updateSpace, addTask, updateTask, submitForReview, reviewTask,
       toggleChecklistItem, toggleChecklistReview, updateModules, addMilestone, toggleMilestone, addDecision, addCheckIn,
       setCheckInFrequency, acknowledgeRecord, sendMessage, startConversation, markNotificationRead, markAllNotificationsRead,
       updateProfile, reportUser, reportOpportunity,
     }),
     [route, navigate, currentUserId, profiles, groups, opportunities, spaces, conversations, notifications, trust,
+     dataLoading, dataError, retryDataLoad,
      createOpportunity, createSpaceFromOpportunity, updateSpace, addTask, updateTask, submitForReview, reviewTask,
      toggleChecklistItem, toggleChecklistReview, updateModules, addMilestone, toggleMilestone, addDecision, addCheckIn,
      setCheckInFrequency, acknowledgeRecord, sendMessage, startConversation, markNotificationRead, markAllNotificationsRead,

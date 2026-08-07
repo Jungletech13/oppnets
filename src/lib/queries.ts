@@ -1,4 +1,15 @@
 import { supabase } from '@/lib/supabase';
+import { mapOpportunityRow, opportunityToInsert } from '@/lib/domain-mappers';
+import type { Opportunity } from '@/types';
+
+export async function fetchProfiles() {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .order('name', { ascending: true });
+  if (error) throw error;
+  return data;
+}
 
 export async function fetchProfile(userId: string) {
   const { data, error } = await supabase
@@ -40,38 +51,35 @@ export async function fetchOpportunity(id: string) {
   return data;
 }
 
-export async function createOpportunity(input: {
-  title: string;
-  description: string;
-  category: string;
-  stage: string;
-  goals: string[];
-  location: string;
-  remote: boolean;
-  time_commitment: string;
-  compensation: string;
-  accepts: string;
-  visibility: string;
-  start_date?: string;
-  creator_brings?: string;
-  skills_needed?: string[];
-  required_skills?: string[];
-  optional_skills?: string[];
-  location_preference?: string;
-  work_style?: string;
-  risk_tolerance?: string;
-  leadership_needs?: string;
-  collaboration_style?: string;
-  mission_drive?: string;
-  funding_status?: string;
-}) {
+export async function createOpportunity(input: Opportunity) {
   const { data, error } = await supabase
     .from('opportunities')
-    .insert(input)
+    .insert(opportunityToInsert(input))
     .select()
     .maybeSingle();
   if (error) throw error;
-  return data;
+  if (!data) throw new Error('Opportunity was created without a returned record.');
+
+  if (input.roles.length > 0) {
+    const { error: rolesError } = await supabase.from('opportunity_roles').insert(
+      input.roles.map((role) => ({
+        opportunity_id: data.id,
+        title: role.title,
+        open_positions: role.openPositions,
+        filled: role.filled,
+        compensation: role.compensation,
+        skills_needed: role.skillsNeeded,
+      }))
+    );
+    if (rolesError) {
+      await supabase.from('opportunities').delete().eq('id', data.id);
+      throw rolesError;
+    }
+  }
+
+  const persisted = await fetchOpportunity(data.id);
+  if (!persisted) throw new Error('Created opportunity could not be reloaded.');
+  return mapOpportunityRow(persisted as Record<string, unknown>);
 }
 
 export async function fetchUserSpaces(userId: string) {
