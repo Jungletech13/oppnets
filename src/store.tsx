@@ -1,3 +1,6 @@
+Exit code: 0
+Wall time: 0.8 seconds
+Output:
 import { createContext, useContext, useState, useCallback, useEffect, useMemo, type ReactNode } from 'react';
 import type {
   Profile,
@@ -22,8 +25,6 @@ import type {
 import {
   GROUPS,
   SPACES,
-  CONVERSATIONS,
-  NOTIFICATIONS,
   MY_TRUST,
 } from './data';
 import { useAuth } from '@/lib/auth';
@@ -34,10 +35,15 @@ import {
   fetchOpportunities,
   fetchProfiles,
   fetchUserSpacesWithDetails,
+  fetchConversations,
+  fetchNotifications,
+  sendMessage as persistMessage,
+  markNotificationRead as persistNotificationRead,
+  markAllNotificationsRead as persistAllNotificationsRead,
   updatePersistedTask,
   updateProfile as persistProfile,
 } from '@/lib/queries';
-import { mapOpportunityRow, mapProfileRow, mapSpaceRow, profileToUpdate } from '@/lib/domain-mappers';
+import { mapConversationRow, mapNotificationRow, mapOpportunityRow, mapProfileRow, mapSpaceRow, profileToUpdate } from '@/lib/domain-mappers';
 
 export type Route =
   | { name: 'landing' }
@@ -136,10 +142,10 @@ interface AppState {
   addCheckIn: (spaceId: ID, ci: CheckIn) => void;
   setCheckInFrequency: (spaceId: ID, f: CheckInFrequency) => void;
   acknowledgeRecord: (spaceId: ID, profileId: ID) => void;
-  sendMessage: (convId: ID, text: string) => void;
+  sendMessage: (convId: ID, text: string) => Promise<void>;
   startConversation: (participantIds: ID[], title: string, type?: Conversation['type'], spaceId?: ID) => ID;
-  markNotificationRead: (id: ID) => void;
-  markAllNotificationsRead: () => void;
+  markNotificationRead: (id: ID) => Promise<void>;
+  markAllNotificationsRead: () => Promise<void>;
   updateProfile: (p: Profile) => Promise<void>;
   reportUser: (targetId: ID, reason: string) => void;
   reportOpportunity: (targetId: ID, reason: string) => void;
@@ -174,8 +180,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [groups] = useState<CollaborationGroup[]>(GROUPS);
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [spaces, setSpaces] = useState<CollaborationSpace[]>(SPACES);
-  const [conversations, setConversations] = useState<Conversation[]>(CONVERSATIONS);
-  const [notifications, setNotifications] = useState<AppNotification[]>(NOTIFICATIONS);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [trust, setTrust] = useState<TrustState>(MY_TRUST);
   const [dataLoading, setDataLoading] = useState(true);
   const [dataError, setDataError] = useState<string | null>(null);
@@ -187,12 +193,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     let active = true;
     setDataLoading(true);
     setDataError(null);
-    Promise.all([fetchProfiles(), fetchOpportunities(), fetchUserSpacesWithDetails(user.id)])
-      .then(([profileRows, opportunityRows, spaceRows]) => {
+    Promise.all([fetchProfiles(), fetchOpportunities(), fetchUserSpacesWithDetails(user.id), fetchConversations(user.id), fetchNotifications(user.id)])
+      .then(([profileRows, opportunityRows, spaceRows, conversationRows, notificationRows]) => {
         if (!active) return;
         setProfiles((profileRows || []).map((row) => mapProfileRow(row as Record<string, unknown>)));
         setOpportunities((opportunityRows || []).map((row) => mapOpportunityRow(row as Record<string, unknown>)));
         setSpaces((spaceRows || []).filter(Boolean).map((row) => mapSpaceRow(row as Record<string, unknown>)));
+        setConversations((conversationRows || []).map((row) => mapConversationRow(row as Record<string, unknown>)));
+        setNotifications((notificationRows || []).map((row) => mapNotificationRow(row as Record<string, unknown>)));
       })
       .catch((error: unknown) => {
         if (!active) return;
@@ -203,6 +211,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
       });
     return () => { active = false; };
   }, [user, loadVersion]);
+
+  useEffect(() => {
+    const restoreFromUrl = () => setRoute(restoreRoute());
+    window.addEventListener('popstate', restoreFromUrl);
+    window.addEventListener('hashchange', restoreFromUrl);
+    return () => {
+      window.removeEventListener('popstate', restoreFromUrl);
+      window.removeEventListener('hashchange', restoreFromUrl);
+    };
+  }, []);
 
   const retryDataLoad = useCallback(() => setLoadVersion((version) => version + 1), []);
 
@@ -337,15 +355,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }));
   }, [updateSpace]);
 
-  const sendMessage = useCallback((convId: ID, text: string) => {
-    setConversations((prev) =>
-      prev.map((c) =>
-        c.id === convId
-          ? { ...c, messages: [...c.messages, { id: uid('msg'), authorId: currentUserId, text, at: nowISO() }] }
-          : c
-      )
-    );
-  }, [currentUserId]);
+  const sendMessage = useCallback(async (convId: ID, text: string) => {
+    const row = await persistMessage(convId, text.trim());
+    if (!row) throw new Error('Message could not be saved.');
+    const message = { id: row.id as string, authorId: row.author_id as string, text: row.text as string, at: row.at as string };
+    setConversations((prev) => prev.map((conversation) =>
+      conversation.id === convId ? { ...conversation, messages: [...conversation.messages, message] } : conversation
+    ));
+  }, []);
 
   const startConversation = useCallback((participantIds: ID[], title: string, type: Conversation['type'] = 'group', spaceId?: ID): ID => {
     const id = uid('conv');
@@ -356,13 +373,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return id;
   }, [currentUserId]);
 
-  const markNotificationRead = useCallback((id: ID) => {
+  const markNotificationRead = useCallback(async (id: ID) => {
+    await persistNotificationRead(id);
     setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
   }, []);
 
-  const markAllNotificationsRead = useCallback(() => {
+  const markAllNotificationsRead = useCallback(async () => {
+    await persistAllNotificationsRead(currentUserId);
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-  }, []);
+  }, [currentUserId]);
 
   const updateProfile = useCallback(async (p: Profile) => {
     await persistProfile(p.id, profileToUpdate(p));
@@ -454,3 +473,4 @@ export const MODULE_PRESETS: Record<string, ModuleKind[]> = {
   'E-commerce Business': ['team_chat', 'tasks', 'milestones', 'customer_pipeline', 'vendors', 'budget', 'decision_log', 'collaboration_record', 'files', 'notes'],
   'General Collaboration': ['team_chat', 'tasks', 'milestones', 'notes', 'files', 'decision_log', 'collaboration_record', 'project_timeline'],
 };
+
