@@ -1,3 +1,6 @@
+Exit code: 0
+Wall time: 1.2 seconds
+Output:
 import { useApp } from '@/store';
 import { PageHeader } from '@/components/AppShell';
 import { Card, Avatar, TrustIndicators, VerificationPill, Badge, SectionHeader, EmptyState, Modal, Field } from '@/components/ui';
@@ -106,7 +109,7 @@ export function ProfilePage({ profileId }: { profileId?: string }) {
               </div>
               <div>
                 <p className="text-xs text-ink-400 mb-1">Availability</p>
-                <p className="text-ink-700">{profile.availability} · {profile.timeCommitment}</p>
+                <p className="text-ink-700">{profile.availability} Â· {profile.timeCommitment}</p>
               </div>
             </div>
           </Card>
@@ -156,7 +159,7 @@ export function ProfilePage({ profileId }: { profileId?: string }) {
                     <Briefcase className="w-4 h-4 text-brand-500" />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-ink-800 truncate">{o.title}</p>
-                      <p className="text-xs text-ink-500">{o.category} · {o.stage}</p>
+                      <p className="text-xs text-ink-500">{o.category} Â· {o.stage}</p>
                     </div>
                     <Badge tone={o.stage === 'Recruiting' ? 'accent' : 'neutral'}>{o.stage}</Badge>
                   </button>
@@ -203,7 +206,7 @@ export function ProfilePage({ profileId }: { profileId?: string }) {
                   return (
                     <div key={i} className="border-l-2 border-brand-200 pl-3">
                       <p className="text-sm text-ink-700 italic">"{e.text}"</p>
-                      <p className="text-xs text-ink-500 mt-1">— {from?.name ?? 'Unknown'} · {e.skill}</p>
+                      <p className="text-xs text-ink-500 mt-1">â€” {from?.name ?? 'Unknown'} Â· {e.skill}</p>
                     </div>
                   );
                 })}
@@ -212,7 +215,7 @@ export function ProfilePage({ profileId }: { profileId?: string }) {
           </Card>
         </div>
 
-        {/* Side column — verifications */}
+        {/* Side column â€” verifications */}
         <div className="space-y-6">
           <Card className="p-5">
             <SectionHeader title="Verification" />
@@ -240,7 +243,7 @@ export function ProfilePage({ profileId }: { profileId?: string }) {
               <div className="flex items-center gap-3">
                 <ShieldCheck className="w-8 h-8 text-accent-500" />
                 <div>
-                  <p className="text-2xl font-bold text-ink-900">{verifiedCollabCount ?? '—'}</p>
+                  <p className="text-2xl font-bold text-ink-900">{verifiedCollabCount ?? 'â€”'}</p>
                   <p className="text-xs text-ink-500">confirmed shared work</p>
                 </div>
               </div>
@@ -257,7 +260,7 @@ export function ProfilePage({ profileId }: { profileId?: string }) {
 
       {/* Report modal */}
       <Modal open={showReport} onClose={() => setShowReport(false)} title="Report this user">
-        <ReportForm onSubmit={(reason) => { reportUser(profile.id, reason); setShowReport(false); }} />
+        <ReportForm onSubmit={async (reason) => { await reportUser(profile.id, reason); setShowReport(false); }} />
       </Modal>
 
       {/* Edit modal */}
@@ -275,7 +278,7 @@ function VentureRow({ v }: { v: VentureOutcome }) {
         <h4 className="font-medium text-ink-900 text-sm">{v.title}</h4>
         <Badge tone={outcomeTone[v.outcome] || 'neutral'}>{v.outcome}</Badge>
       </div>
-      <p className="text-xs text-ink-500 mt-0.5">{v.role} · {v.industry} · {v.year}</p>
+      <p className="text-xs text-ink-500 mt-0.5">{v.role} Â· {v.industry} Â· {v.year}</p>
       <p className="text-sm text-ink-600 mt-1.5">{v.summary}</p>
       <p className="text-xs text-ink-400 mt-1.5">Visibility: {visibilityLabel[v.visibility]}</p>
     </div>
@@ -292,13 +295,27 @@ function MessageComposer({ onSend }: { onSend: (text: string) => void }) {
   );
 }
 
-function ReportForm({ onSubmit }: { onSubmit: (reason: string) => void }) {
+function ReportForm({ onSubmit }: { onSubmit: (reason: string) => Promise<void> }) {
   const [reason, setReason] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const submit = async () => {
+    setSubmitting(true);
+    setError(null);
+    try {
+      await onSubmit(reason);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not submit the report.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
   return (
     <div className="space-y-3">
       <p className="text-sm text-ink-500">Reports are reviewed by moderation. Use factual language.</p>
       <Field label="Reason"><textarea className="input min-h-[80px]" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Describe the concern factually..." /></Field>
-      <div className="flex justify-end"><button onClick={() => reason && onSubmit(reason)} className="btn-primary" disabled={!reason}>Submit report</button></div>
+      {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
+      <div className="flex justify-end"><button onClick={() => void submit()} className="btn-primary" disabled={submitting || reason.trim().length < 10}>{submitting ? 'Submitting...' : 'Submit report'}</button></div>
     </div>
   );
 }
@@ -338,3 +355,4 @@ function EditProfileForm({ profile, onSave }: { profile: Profile; onSave: () => 
     </div>
   );
 }
+
