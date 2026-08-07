@@ -71,6 +71,27 @@ export type Route =
   | { name: 'admin-audit' }
   | { name: 'admin-subscriptions' };
 
+const routeStorageKey = 'oppnets:last-route';
+const routeNames = new Set<Route['name']>([
+  'landing', 'home', 'discover', 'people', 'my-opportunities', 'space', 'messages',
+  'notifications', 'profile', 'trust', 'settings', 'opportunity', 'create-opportunity',
+  'toolkit', 'professionals', 'professional', 'companies', 'company', 'partners',
+  'pricing', 'success-stories', 'resources', 'resource', 'admin', 'admin-users',
+  'admin-verification', 'admin-moderation', 'admin-collaborations', 'admin-audit',
+  'admin-subscriptions',
+]);
+
+function restoreRoute(): Route {
+  try {
+    const saved = window.sessionStorage.getItem(routeStorageKey);
+    if (!saved) return { name: 'landing' };
+    const parsed = JSON.parse(saved) as Partial<Route>;
+    return parsed.name && routeNames.has(parsed.name) ? parsed as Route : { name: 'landing' };
+  } catch {
+    return { name: 'landing' };
+  }
+}
+
 interface AppState {
   route: Route;
   navigate: (r: Route) => void;
@@ -135,7 +156,7 @@ export { taskProgress };
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
-  const [route, setRoute] = useState<Route>({ name: 'landing' });
+  const [route, setRoute] = useState<Route>(restoreRoute);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [groups] = useState<CollaborationGroup[]>(GROUPS);
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
@@ -174,6 +195,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const navigate = useCallback((r: Route) => {
     setRoute(r);
+    try {
+      window.sessionStorage.setItem(routeStorageKey, JSON.stringify(r));
+    } catch {
+      // Navigation still works when browser storage is restricted.
+    }
     window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
   }, []);
 
