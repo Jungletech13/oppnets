@@ -5,8 +5,20 @@ import {
 } from 'lucide-react';
 
 export function LandingPage() {
-  const { navigate } = useApp();
+  const { navigate, profiles, currentUserId } = useApp();
   const { user, signOut } = useAuth();
+  const profile = profiles.find((candidate) => candidate.id === currentUserId);
+  const profileComplete = Boolean(
+    profile?.name.trim()
+    && profile.headline.trim()
+    && profile.bio.trim()
+    && profile.location.trim()
+    && profile.skills.length
+    && profile.industries.length
+    && profile.interests.length
+    && profile.timeCommitment !== 'Not specified'
+  );
+  const profileActionLabel = profileComplete ? 'View Your Profile' : 'Finish Your Profile';
 
   return (
     <div className="min-h-screen bg-white">
@@ -46,7 +58,7 @@ export function LandingPage() {
                 <Compass className="w-5 h-5" /> Explore Opportunities
               </button>
               <button onClick={() => navigate({ name: 'profile' })} className="btn-secondary text-base px-6 py-3">
-                Create Your Profile <ArrowRight className="w-4 h-4" />
+                {profileActionLabel} <ArrowRight className="w-4 h-4" />
               </button>
             </div>
             <p className="mt-4 text-xs text-ink-400">Not a social feed. No followers, no likes — just real ventures and verified collaborators.</p>
@@ -138,7 +150,7 @@ export function LandingPage() {
               <Compass className="w-5 h-5" /> Explore Opportunities
             </button>
             <button onClick={() => navigate({ name: 'profile' })} className="btn bg-brand-600 text-white hover:bg-brand-700 px-6 py-3 text-base">
-              Create Your Profile
+              {profileActionLabel}
             </button>
           </div>
         </div>
