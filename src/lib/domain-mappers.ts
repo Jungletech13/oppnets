@@ -28,7 +28,7 @@ export function mapProfileRow(row: Row): Profile {
       : (row.what_im_looking_for as string[]) || [],
     industries: (row.industries as Industry[]) || [],
     availability: (row.availability as Profile['availability']) || 'Available',
-    timeCommitment: (row.time_commitment as Profile['timeCommitment']) || 'Part-time',
+    timeCommitment: (row.time_commitment as Profile['timeCommitment']) || 'Not specified',
     opportunitiesSought: (row.what_im_looking_for as string[]) || [],
     buildingIds: [],
     ventureHistory: [],
