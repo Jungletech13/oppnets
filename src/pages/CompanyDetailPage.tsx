@@ -7,7 +7,7 @@ import { getCompany } from '@/data-phase2';
 import { fetchCompany, toggleSavedListing, isListingSaved } from '@/lib/queries';
 import { getProfile } from '@/data';
 import { useAuth } from '@/lib/auth';
-import type { Company, CompanySize } from '@/types';
+import type { Company, CompanySize, Industry } from '@/types';
 
 interface DbCompany extends Company {
   company_reviews?: Company['reviews'];
@@ -34,7 +34,7 @@ export function CompanyDetailPage({ companyId }: { companyId: string }) {
           description: (r.description as string) || '',
           mission: (r.mission as string) || '',
           services: (r.services as string[]) || [],
-          industries: (r.industries as string[]) || [],
+          industries: (r.industries as Industry[]) || [],
           size: (r.size as CompanySize) || '1-10',
           location: (r.location as string) || '',
           website: (r.website as string) || '',

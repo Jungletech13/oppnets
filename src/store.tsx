@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, useMemo, type ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, useMemo, type ReactNode } from 'react';
 import type {
   Profile,
   Opportunity,
@@ -20,14 +20,24 @@ import type {
   TrustState,
 } from './types';
 import {
-  PROFILES,
   GROUPS,
-  OPPORTUNITIES,
   SPACES,
   CONVERSATIONS,
   NOTIFICATIONS,
   MY_TRUST,
 } from './data';
+import { useAuth } from '@/lib/auth';
+import {
+  createOpportunity as persistOpportunity,
+  createCollaborationSpace,
+  createTask,
+  fetchOpportunities,
+  fetchProfiles,
+  fetchUserSpacesWithDetails,
+  updatePersistedTask,
+  updateProfile as persistProfile,
+} from '@/lib/queries';
+import { mapOpportunityRow, mapProfileRow, mapSpaceRow, profileToUpdate } from '@/lib/domain-mappers';
 
 export type Route =
   | { name: 'landing' }
@@ -72,16 +82,19 @@ interface AppState {
   conversations: Conversation[];
   notifications: AppNotification[];
   trust: TrustState;
+  dataLoading: boolean;
+  dataError: string | null;
+  retryDataLoad: () => void;
   // actions
-  createOpportunity: (o: Opportunity) => void;
-  createSpaceFromOpportunity: (oppId: ID, name: string, description: string, memberIds: ID[]) => ID;
+  createOpportunity: (o: Opportunity) => Promise<Opportunity>;
+  createSpaceFromOpportunity: (oppId: ID, name: string, description: string, memberIds: ID[]) => Promise<ID>;
   updateSpace: (spaceId: ID, updater: (s: CollaborationSpace) => CollaborationSpace) => void;
-  addTask: (spaceId: ID, task: Task) => void;
-  updateTask: (spaceId: ID, taskId: ID, updater: (t: Task) => Task) => void;
-  submitForReview: (spaceId: ID, taskId: ID) => void;
-  reviewTask: (spaceId: ID, taskId: ID, action: 'approve' | 'changes' | 'discussion', feedback?: Omit<Feedback, 'id' | 'at'>) => void;
-  toggleChecklistItem: (spaceId: ID, taskId: ID, itemId: ID) => void;
-  toggleChecklistReview: (spaceId: ID, taskId: ID, itemId: ID) => void;
+  addTask: (spaceId: ID, task: Task) => Promise<void>;
+  updateTask: (spaceId: ID, taskId: ID, updater: (t: Task) => Task) => Promise<void>;
+  submitForReview: (spaceId: ID, taskId: ID) => Promise<void>;
+  reviewTask: (spaceId: ID, taskId: ID, action: 'approve' | 'changes' | 'discussion', feedback?: Omit<Feedback, 'id' | 'at'>) => Promise<void>;
+  toggleChecklistItem: (spaceId: ID, taskId: ID, itemId: ID) => Promise<void>;
+  toggleChecklistReview: (spaceId: ID, taskId: ID, itemId: ID) => Promise<void>;
   updateModules: (spaceId: ID, modules: WorkspaceModule[]) => void;
   addMilestone: (spaceId: ID, m: Milestone) => void;
   toggleMilestone: (spaceId: ID, milestoneId: ID) => void;
@@ -93,7 +106,7 @@ interface AppState {
   startConversation: (participantIds: ID[], title: string, type?: Conversation['type'], spaceId?: ID) => ID;
   markNotificationRead: (id: ID) => void;
   markAllNotificationsRead: () => void;
-  updateProfile: (p: Profile) => void;
+  updateProfile: (p: Profile) => Promise<void>;
   reportUser: (targetId: ID, reason: string) => void;
   reportOpportunity: (targetId: ID, reason: string) => void;
 }
@@ -121,68 +134,63 @@ function taskProgress(t: Task): { done: number; total: number; pct: number; appr
 export { taskProgress };
 
 export function AppProvider({ children }: { children: ReactNode }) {
+  const { user } = useAuth();
   const [route, setRoute] = useState<Route>({ name: 'landing' });
-  const [profiles, setProfiles] = useState<Profile[]>(PROFILES);
+  const [profiles, setProfiles] = useState<Profile[]>([]);
   const [groups] = useState<CollaborationGroup[]>(GROUPS);
-  const [opportunities, setOpportunities] = useState<Opportunity[]>(OPPORTUNITIES);
+  const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [spaces, setSpaces] = useState<CollaborationSpace[]>(SPACES);
   const [conversations, setConversations] = useState<Conversation[]>(CONVERSATIONS);
   const [notifications, setNotifications] = useState<AppNotification[]>(NOTIFICATIONS);
   const [trust, setTrust] = useState<TrustState>(MY_TRUST);
-  const currentUserId = 'p-me';
+  const [dataLoading, setDataLoading] = useState(true);
+  const [dataError, setDataError] = useState<string | null>(null);
+  const [loadVersion, setLoadVersion] = useState(0);
+  const currentUserId = user?.id ?? '';
+
+  useEffect(() => {
+    if (!user) return;
+    let active = true;
+    setDataLoading(true);
+    setDataError(null);
+    Promise.all([fetchProfiles(), fetchOpportunities(), fetchUserSpacesWithDetails(user.id)])
+      .then(([profileRows, opportunityRows, spaceRows]) => {
+        if (!active) return;
+        setProfiles((profileRows || []).map((row) => mapProfileRow(row as Record<string, unknown>)));
+        setOpportunities((opportunityRows || []).map((row) => mapOpportunityRow(row as Record<string, unknown>)));
+        setSpaces((spaceRows || []).filter(Boolean).map((row) => mapSpaceRow(row as Record<string, unknown>)));
+      })
+      .catch((error: unknown) => {
+        if (!active) return;
+        setDataError(error instanceof Error ? error.message : 'Could not load your OppNets data.');
+      })
+      .finally(() => {
+        if (active) setDataLoading(false);
+      });
+    return () => { active = false; };
+  }, [user, loadVersion]);
+
+  const retryDataLoad = useCallback(() => setLoadVersion((version) => version + 1), []);
 
   const navigate = useCallback((r: Route) => {
     setRoute(r);
     window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
   }, []);
 
-  const createOpportunity = useCallback((o: Opportunity) => {
-    setOpportunities((prev) => [o, ...prev]);
+  const createOpportunity = useCallback(async (o: Opportunity) => {
+    const persisted = await persistOpportunity(o);
+    setOpportunities((prev) => [persisted, ...prev]);
+    return persisted;
   }, []);
 
   const createSpaceFromOpportunity = useCallback(
-    (oppId: ID, name: string, description: string, memberIds: ID[]): ID => {
-      const id = uid('cs');
+    async (oppId: ID, name: string, description: string, memberIds: ID[]): Promise<ID> => {
       const opp = opportunities.find((o) => o.id === oppId);
-      const newSpace: CollaborationSpace = {
-        id,
-        opportunityId: oppId,
-        name,
-        description,
-        mission: opp?.description ?? '',
-        successDefinition: '',
-        memberIds,
-        roles: Object.fromEntries(memberIds.map((m, i) => [m, i === 0 ? 'Lead' : 'Contributor'])),
-        tasks: [],
-        milestones: [],
-        files: [],
-        notes: '',
-        decisions: [],
-        activity: [{ id: uid('a'), at: nowISO(), text: 'Space created', actorId: currentUserId }],
-        modules: defaultModules(opp?.category),
-        record: {
-          projectName: name,
-          opportunityCreatorId: opp?.ownerId ?? currentUserId,
-          ideaOrigin: 'Created from an opportunity listing.',
-          beganAt: nowISO().slice(0, 10),
-          participants: memberIds.map((p) => ({
-            profileId: p,
-            role: p === opp?.ownerId ? 'Lead' : 'Contributor',
-            expectedContribution: '',
-            responsibilities: '',
-          })),
-          goals: opp?.goals ?? [],
-          milestones: [],
-          communicationExpectations: 'Weekly check-in, async in team chat.',
-          majorDecisions: [],
-          acknowledgments: [currentUserId],
-        },
-        checkIns: [],
-        checkInFrequency: 'Weekly',
-        nextCheckIn: '',
-      };
+      const row = await createCollaborationSpace({ opportunityId: oppId, name, description, mission: opp?.description ?? '', memberIds });
+      if (!row) throw new Error('Created collaboration space could not be loaded.');
+      const newSpace = mapSpaceRow(row as Record<string, unknown>);
       setSpaces((prev) => [newSpace, ...prev]);
-      return id;
+      return newSpace.id;
     },
     [opportunities, currentUserId]
   );
@@ -191,90 +199,62 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setSpaces((prev) => prev.map((s) => (s.id === spaceId ? updater(s) : s)));
   }, []);
 
-  const addTask = useCallback((spaceId: ID, task: Task) => {
-    setSpaces((prev) =>
-      prev.map((s) =>
-        s.id === spaceId
-          ? { ...s, tasks: [...s.tasks, task], activity: [{ id: uid('a'), at: nowISO(), text: `Task created: ${task.title}`, actorId: task.ownerId }, ...s.activity] }
-          : s
-      )
-    );
+  const addTask = useCallback(async (spaceId: ID, task: Task) => {
+    const row = await createTask(spaceId, task);
+    if (!row) throw new Error('Created task could not be loaded.');
+    const persistedSpace = mapSpaceRow(row as Record<string, unknown>);
+    setSpaces((prev) => prev.map((space) => (space.id === spaceId ? persistedSpace : space)));
   }, []);
 
-  const updateTask = useCallback((spaceId: ID, taskId: ID, updater: (t: Task) => Task) => {
-    setSpaces((prev) =>
-      prev.map((s) =>
-        s.id === spaceId
-          ? { ...s, tasks: s.tasks.map((t) => (t.id === taskId ? updater(t) : t)) }
-          : s
-      )
-    );
-  }, []);
+  const updateTask = useCallback(async (spaceId: ID, taskId: ID, updater: (t: Task) => Task) => {
+    const task = spaces.find((space) => space.id === spaceId)?.tasks.find((candidate) => candidate.id === taskId);
+    if (!task) throw new Error('Task not found.');
+    const row = await updatePersistedTask(spaceId, updater(task));
+    if (!row) throw new Error('Updated task could not be loaded.');
+    const persistedSpace = mapSpaceRow(row as Record<string, unknown>);
+    setSpaces((prev) => prev.map((space) => (space.id === spaceId ? persistedSpace : space)));
+  }, [spaces]);
 
-  const toggleChecklistItem = useCallback((spaceId: ID, taskId: ID, itemId: ID) => {
-    updateTask(spaceId, taskId, (t) => ({
+  const toggleChecklistItem = useCallback(async (spaceId: ID, taskId: ID, itemId: ID) => {
+    await updateTask(spaceId, taskId, (t) => ({
       ...t,
       checklist: t.checklist.map((c) => (c.id === itemId ? { ...c, done: !c.done, submittedForReview: c.done ? false : c.submittedForReview } : c)),
     }));
   }, [updateTask]);
 
-  const toggleChecklistReview = useCallback((spaceId: ID, taskId: ID, itemId: ID) => {
-    updateTask(spaceId, taskId, (t) => ({
+  const toggleChecklistReview = useCallback(async (spaceId: ID, taskId: ID, itemId: ID) => {
+    await updateTask(spaceId, taskId, (t) => ({
       ...t,
       checklist: t.checklist.map((c) => (c.id === itemId ? { ...c, submittedForReview: !c.submittedForReview } : c)),
     }));
   }, [updateTask]);
 
-  const submitForReview = useCallback((spaceId: ID, taskId: ID) => {
-    setSpaces((prev) =>
-      prev.map((s) => {
-        if (s.id !== spaceId) return s;
-        const task = s.tasks.find((t) => t.id === taskId);
-        if (!task) return s;
-        const updatedTask: Task = {
+  const submitForReview = useCallback(async (spaceId: ID, taskId: ID) => {
+    await updateTask(spaceId, taskId, (task) => ({
           ...task,
           status: 'Ready for review',
           checklist: task.checklist.map((c) => (c.done ? { ...c, submittedForReview: true } : c)),
           revisions: [...task.revisions, { version: task.revisions.length + 1, at: nowISO(), by: task.ownerId, note: 'Submitted for review', status: 'Ready for review' }],
-        };
-        return {
-          ...s,
-          tasks: s.tasks.map((t) => (t.id === taskId ? updatedTask : t)),
-          activity: [{ id: uid('a'), at: nowISO(), text: `${task.title} submitted for review`, actorId: task.ownerId }, ...s.activity],
-        };
-      })
-    );
-  }, []);
+    }));
+  }, [updateTask]);
 
   const reviewTask = useCallback(
-    (spaceId: ID, taskId: ID, action: 'approve' | 'changes' | 'discussion', feedback?: Omit<Feedback, 'id' | 'at'>) => {
-      setSpaces((prev) =>
-        prev.map((s) => {
-          if (s.id !== spaceId) return s;
-          const task = s.tasks.find((t) => t.id === taskId);
-          if (!task) return s;
+    async (spaceId: ID, taskId: ID, action: 'approve' | 'changes' | 'discussion', feedback?: Omit<Feedback, 'id' | 'at'>) => {
+      await updateTask(spaceId, taskId, (task) => {
           let newStatus: TaskStatus;
           if (action === 'approve') newStatus = 'Approved';
           else if (action === 'changes') newStatus = 'Changes requested';
           else newStatus = 'Needs discussion';
-          const updatedTask: Task = {
+          return {
             ...task,
             status: newStatus,
             revisions: [...task.revisions, { version: task.revisions.length + 1, at: nowISO(), by: task.reviewerId, note: action === 'approve' ? 'Approved' : action === 'changes' ? 'Changes requested' : 'Needs discussion', status: newStatus }],
             feedback: action === 'changes' && feedback ? { ...feedback, id: uid('fb'), at: nowISO() } : task.feedback,
             checklist: action === 'approve' ? task.checklist.map((c) => ({ ...c, submittedForReview: false })) : task.checklist,
           };
-          const activityText =
-            action === 'approve' ? `${task.title} approved` : action === 'changes' ? `Changes requested on ${task.title}` : `${task.title} needs discussion`;
-          return {
-            ...s,
-            tasks: s.tasks.map((t) => (t.id === taskId ? updatedTask : t)),
-            activity: [{ id: uid('a'), at: nowISO(), text: activityText, actorId: task.reviewerId }, ...s.activity],
-          };
-        })
-      );
+      });
     },
-    []
+    [updateTask]
   );
 
   const updateModules = useCallback((spaceId: ID, modules: WorkspaceModule[]) => {
@@ -344,7 +324,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
   }, []);
 
-  const updateProfile = useCallback((p: Profile) => {
+  const updateProfile = useCallback(async (p: Profile) => {
+    await persistProfile(p.id, profileToUpdate(p));
     setProfiles((prev) => prev.map((x) => (x.id === p.id ? p : x)));
   }, []);
 
@@ -365,12 +346,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const value = useMemo<AppState>(
     () => ({
       route, navigate, currentUserId, profiles, groups, opportunities, spaces, conversations, notifications, trust,
+      dataLoading, dataError, retryDataLoad,
       createOpportunity, createSpaceFromOpportunity, updateSpace, addTask, updateTask, submitForReview, reviewTask,
       toggleChecklistItem, toggleChecklistReview, updateModules, addMilestone, toggleMilestone, addDecision, addCheckIn,
       setCheckInFrequency, acknowledgeRecord, sendMessage, startConversation, markNotificationRead, markAllNotificationsRead,
       updateProfile, reportUser, reportOpportunity,
     }),
     [route, navigate, currentUserId, profiles, groups, opportunities, spaces, conversations, notifications, trust,
+     dataLoading, dataError, retryDataLoad,
      createOpportunity, createSpaceFromOpportunity, updateSpace, addTask, updateTask, submitForReview, reviewTask,
      toggleChecklistItem, toggleChecklistReview, updateModules, addMilestone, toggleMilestone, addDecision, addCheckIn,
      setCheckInFrequency, acknowledgeRecord, sendMessage, startConversation, markNotificationRead, markAllNotificationsRead,

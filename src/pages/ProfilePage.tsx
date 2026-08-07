@@ -306,6 +306,20 @@ function ReportForm({ onSubmit }: { onSubmit: (reason: string) => void }) {
 function EditProfileForm({ profile, onSave }: { profile: Profile; onSave: () => void }) {
   const { updateProfile } = useApp();
   const [p, setP] = useState<Profile>(profile);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const save = async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      await updateProfile(p);
+      onSave();
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : 'Could not save your profile.');
+    } finally {
+      setSaving(false);
+    }
+  };
   return (
     <div className="space-y-3">
       <Field label="Name"><input className="input" value={p.name} onChange={(e) => setP({ ...p, name: e.target.value })} /></Field>
@@ -316,7 +330,8 @@ function EditProfileForm({ profile, onSave }: { profile: Profile; onSave: () => 
         <Field label="Availability"><select className="input" value={p.availability} onChange={(e) => setP({ ...p, availability: e.target.value as Profile['availability'] })}><option>Available</option><option>Limited</option><option>Unavailable</option></select></Field>
       </div>
       <Field label="Skills (comma separated)"><input className="input" value={p.skills.join(', ')} onChange={(e) => setP({ ...p, skills: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) })} /></Field>
-      <div className="flex justify-end"><button onClick={() => { updateProfile(p); onSave(); }} className="btn-primary">Save</button></div>
+      {error && <p className="text-sm text-red-600" role="alert">{error}</p>}
+      <div className="flex justify-end"><button onClick={save} className="btn-primary" disabled={saving}>{saving ? 'Saving...' : 'Save'}</button></div>
     </div>
   );
 }

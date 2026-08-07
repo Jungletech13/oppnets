@@ -6,7 +6,7 @@ import { MapPin, Star, ShieldCheck, Globe, Clock, DollarSign, Mail, CheckCircle2
 import { getProfessional } from '@/data-phase2';
 import { fetchProfessional, sendInquiry, toggleSavedListing, isListingSaved } from '@/lib/queries';
 import { useAuth } from '@/lib/auth';
-import type { Professional, ProfessionalCategory } from '@/types';
+import type { Industry, Professional, ProfessionalCategory } from '@/types';
 
 interface DbProfessional extends Professional {
   professional_reviews?: Professional['reviews'];
@@ -35,7 +35,7 @@ export function ProfessionalDetailPage({ professionalId }: { professionalId: str
           category: r.category as ProfessionalCategory,
           description: (r.description as string) || '',
           services: (r.services as string[]) || [],
-          industriesServed: (r.industries_served as string[]) || [],
+          industriesServed: (r.industries_served as Industry[]) || [],
           location: (r.location as string) || '',
           remote: (r.remote as boolean) ?? true,
           portfolio: (r.portfolio as Professional['portfolio']) || [],

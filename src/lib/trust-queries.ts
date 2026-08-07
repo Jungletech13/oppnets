@@ -124,10 +124,13 @@ export async function updateTrustConfig(key: string, value: unknown, description
 // ============ Verified Collaborations ============
 
 export async function fetchMyVerifiedCollaborations() {
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  if (userError) throw userError;
+  if (!user) return [];
   const { data, error } = await supabase
     .from('verified_collaborations')
     .select('*')
-    .or(`participant_one_id.eq.${supabase.auth.getUserIdentity()?.id},participant_two_id.eq.${supabase.auth.getUserIdentity()?.id}`)
+    .or(`participant_one_id.eq.${user.id},participant_two_id.eq.${user.id}`)
     .order('generated_at', { ascending: false });
   if (error) throw error;
   return data as VerifiedCollaboration[];

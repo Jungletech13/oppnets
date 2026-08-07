@@ -240,7 +240,7 @@ export function AdminCollaborationsPage() {
                         <div key={vc.id} className="text-sm bg-ink-50 rounded-lg px-3 py-2">
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
-                              <Badge tone={vc.verification_status === 'verified' ? 'accent' : vc.verification_status === 'invalidated' ? 'error' : 'neutral'}>
+                              <Badge tone={vc.verification_status === 'verified' ? 'accent' : vc.verification_status === 'invalidated' ? 'red' : 'neutral'}>
                                 {vc.verification_status.replace(/_/g, ' ')}
                               </Badge>
                               <span className="text-xs text-ink-500">

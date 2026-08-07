@@ -63,6 +63,8 @@ export function CreateOpportunityPage() {
   const [step, setStep] = useState(0);
   const [showPreview, setShowPreview] = useState(false);
   const [draftRestored, setDraftRestored] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+  const [publishError, setPublishError] = useState<string | null>(null);
 
   const [form, setForm] = useState(() => {
     const draft = loadDraft();
@@ -107,10 +109,18 @@ export function CreateOpportunityPage() {
     },
   });
 
-  const publish = () => {
-    createOpportunity(buildOpportunity());
-    clearDraft();
-    navigate({ name: 'discover' });
+  const publish = async () => {
+    setPublishing(true);
+    setPublishError(null);
+    try {
+      await createOpportunity(buildOpportunity());
+      clearDraft();
+      navigate({ name: 'discover' });
+    } catch (error) {
+      setPublishError(error instanceof Error ? error.message : 'Could not publish this opportunity.');
+    } finally {
+      setPublishing(false);
+    }
   };
 
   const discardDraft = () => {
@@ -262,6 +272,8 @@ export function CreateOpportunityPage() {
         )}
       </Card>
 
+      {publishError && <p className="text-sm text-red-600 mt-3" role="alert">{publishError}</p>}
+
       {/* Nav buttons */}
       <div className="flex items-center justify-between mt-5">
         <button onClick={() => step > 0 ? setStep(step - 1) : navigate({ name: 'discover' })} className="btn-secondary"><ArrowLeft className="w-4 h-4" /> {step === 0 ? 'Cancel' : 'Back'}</button>
@@ -272,7 +284,7 @@ export function CreateOpportunityPage() {
           ) : (
             <div className="flex gap-2">
               <button onClick={() => setShowPreview(true)} className="btn-secondary"><Eye className="w-4 h-4" /> Full preview</button>
-              <button onClick={publish} className="btn-primary">Publish <Check className="w-4 h-4" /></button>
+              <button onClick={publish} className="btn-primary" disabled={publishing}>{publishing ? 'Publishing...' : 'Publish'} <Check className="w-4 h-4" /></button>
             </div>
           )}
         </div>
