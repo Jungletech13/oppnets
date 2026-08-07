@@ -1,3 +1,6 @@
+Exit code: 0
+Wall time: 1.2 seconds
+Output:
 import { supabase } from '@/lib/supabase';
 import { mapOpportunityRow, opportunityToInsert } from '@/lib/domain-mappers';
 import type { Opportunity } from '@/types';
@@ -262,6 +265,46 @@ export async function markAllNotificationsRead(userId: string) {
   if (error) throw error;
 }
 
+export async function fetchUserReports(userId: string) {
+  const { data, error } = await supabase
+    .from('user_reports')
+    .select('*')
+    .eq('reporter_id', userId)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data;
+}
+
+export async function submitUserReport(targetType: 'user' | 'opportunity', targetId: string, reason: string) {
+  const { data, error } = await supabase
+    .from('user_reports')
+    .insert({ target_type: targetType, target_id: targetId, reason: reason.trim() })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function fetchUserAppeals(userId: string) {
+  const { data, error } = await supabase
+    .from('moderation_appeals')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data;
+}
+
+export async function submitModerationAppeal(decision: string, reason: string) {
+  const { data, error } = await supabase
+    .from('moderation_appeals')
+    .insert({ decision: decision.trim(), reason: reason.trim() })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
 export async function fetchVerificationClaims(userId: string) {
   const { data, error } = await supabase
     .from('verification_claims')
@@ -336,7 +379,7 @@ export async function subscribeToNotifications(userId: string, callback: (payloa
     .subscribe();
 }
 
-// ============ Phase 2B — Marketplace ============
+// ============ Phase 2B â€” Marketplace ============
 
 export async function fetchProfessionals() {
   const { data, error } = await supabase
@@ -512,3 +555,4 @@ export async function isListingSaved(listingType: string, listingId: string) {
     .maybeSingle();
   return !!data;
 }
+
