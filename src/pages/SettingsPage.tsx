@@ -1,15 +1,17 @@
 import { useApp } from '@/store';
 import { PageHeader } from '@/components/AppShell';
 import { Card, SectionHeader, Field, Badge } from '@/components/ui';
-import { Bell, Shield, Globe, User, LogOut } from 'lucide-react';
+import { Bell, Shield, Globe, User, LogOut, CreditCard } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '@/lib/auth';
+import { useMembership } from '@/lib/use-membership';
 
 type NotifKey = 'reviews' | 'messages' | 'checkIns' | 'weekly';
 
 export function SettingsPage() {
-  const { currentUserId, profiles, updateProfile } = useApp();
+  const { currentUserId, profiles, updateProfile, navigate } = useApp();
   const { signOut } = useAuth();
+  const { plan, subscription, loading: membershipLoading, error: membershipError } = useMembership();
   const me = profiles.find((p) => p.id === currentUserId)!;
   const [notif, setNotif] = useState<Record<NotifKey, boolean>>({ reviews: true, messages: true, checkIns: true, weekly: false });
   const [visibility, setVisibility] = useState('public');
@@ -22,12 +24,42 @@ export function SettingsPage() {
 
       <div className="space-y-6">
         <Card className="p-5">
+          <SectionHeader title="Membership & billing" />
+          {membershipLoading ? (
+            <p className="text-sm text-ink-500">Loading your membership...</p>
+          ) : membershipError ? (
+            <p className="text-sm text-red-600">{membershipError}</p>
+          ) : (
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-lg bg-brand-50 text-brand-600 flex items-center justify-center">
+                  <CreditCard className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <p className="font-semibold text-ink-900">{plan?.name ?? 'Builder Free'}</p>
+                    <Badge tone="accent">{subscription?.status ?? 'free'}</Badge>
+                  </div>
+                  <p className="text-sm text-ink-500 mt-1">
+                    {plan ? (plan.price_cents === 0 ? 'Free forever' : `$${(plan.price_cents / 100).toFixed(0)} per ${plan.billing_interval === 'yearly' ? 'year' : 'month'}`) : 'Core membership'}
+                  </p>
+                  {subscription?.expires_at && (
+                    <p className="text-xs text-ink-400 mt-1">Current period ends {new Date(subscription.expires_at).toLocaleDateString()}</p>
+                  )}
+                </div>
+              </div>
+              <button onClick={() => navigate({ name: 'pricing' })} className="btn-secondary">View plans</button>
+            </div>
+          )}
+        </Card>
+
+        <Card className="p-5">
           <SectionHeader title="Profile visibility" />
           <div className="space-y-2">
             {[
-              { v: 'public', label: 'Public — visible to anyone', icon: Globe },
-              { v: 'network', label: 'Network only — visible to connected users', icon: User },
-              { v: 'private', label: 'Private — visible only to you', icon: Shield },
+              { v: 'public', label: 'Public â€” visible to anyone', icon: Globe },
+              { v: 'network', label: 'Network only â€” visible to connected users', icon: User },
+              { v: 'private', label: 'Private â€” visible only to you', icon: Shield },
             ].map((opt) => (
               <button key={opt.v} onClick={() => setVisibility(opt.v)} className={`w-full text-left p-3 rounded-lg border flex items-center gap-3 ${visibility === opt.v ? 'border-brand-500 bg-brand-50' : 'border-ink-200'}`}>
                 <opt.icon className={`w-4 h-4 ${visibility === opt.v ? 'text-brand-600' : 'text-ink-400'}`} />
@@ -81,3 +113,4 @@ export function SettingsPage() {
     </div>
   );
 }
+

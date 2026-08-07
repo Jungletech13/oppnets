@@ -2,8 +2,11 @@ import { PageHeader } from '@/components/AppShell';
 import { Card, Badge } from '@/components/ui';
 import { Check, X, Sparkles } from 'lucide-react';
 import { PRICING_PLANS } from '@/data-phase2';
+import { useMembership } from '@/lib/use-membership';
 
 export function PricingPage() {
+  const { plan: currentPlan, loading } = useMembership();
+
   return (
     <div>
       <PageHeader title="Pricing" subtitle="Start free. Upgrade when you need more. Every plan strengthens the mission: every connection should lead to an opportunity." />
@@ -32,16 +35,22 @@ export function PricingPage() {
               ))}
             </div>
 
-            <button className={plan.highlighted ? 'btn-primary w-full' : 'btn-secondary w-full'}>{plan.cta}</button>
+            <button
+              className={plan.highlighted && currentPlan?.slug !== plan.tier ? 'btn-primary w-full' : 'btn-secondary w-full'}
+              disabled={loading || currentPlan?.slug === plan.tier}
+            >
+              {loading ? 'Checking plan...' : currentPlan?.slug === plan.tier ? 'Current plan' : plan.cta}
+            </button>
           </Card>
         ))}
       </div>
 
       <Card className="p-5 mt-5">
         <p className="text-xs text-ink-500 text-center">
-          Pricing architecture only — no payment processing yet. Plans will be available when billing is enabled.
+          Pricing architecture only â€” no payment processing yet. Plans will be available when billing is enabled.
         </p>
       </Card>
     </div>
   );
 }
+
