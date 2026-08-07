@@ -1,10 +1,12 @@
 import { useApp } from '@/store';
+import { useAuth } from '@/lib/auth';
 import {
   Compass, ShieldCheck, Users, LayoutDashboard, TrendingUp, Sparkles, ArrowRight, CheckCircle2, Building2, Heart, Film, ShoppingBag, Laptop, Wrench,
 } from 'lucide-react';
 
 export function LandingPage() {
   const { navigate } = useApp();
+  const { user, signOut } = useAuth();
 
   return (
     <div className="min-h-screen bg-white">
@@ -16,8 +18,12 @@ export function LandingPage() {
             <span className="font-semibold text-ink-900">Opportunity Network</span>
           </div>
           <div className="flex items-center gap-2">
+            <span className="hidden lg:inline text-xs text-ink-500" title={user?.email}>
+              Signed in as {user?.email}
+            </span>
             <button onClick={() => navigate({ name: 'discover' })} className="btn-ghost hidden sm:inline-flex">Explore Opportunities</button>
-            <button onClick={() => navigate({ name: 'home' })} className="btn-primary">Enter App</button>
+            <button onClick={() => navigate({ name: 'home' })} className="btn-primary">Open Workspace</button>
+            <button onClick={() => void signOut()} className="btn-ghost">Sign Out</button>
           </div>
         </div>
       </header>
