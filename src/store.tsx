@@ -82,6 +82,13 @@ const routeNames = new Set<Route['name']>([
 ]);
 
 function restoreRoute(): Route {
+  if (window.location.hash.startsWith('#/')) {
+    const [rawName, rawQuery = ''] = window.location.hash.slice(2).split('?');
+    const name = decodeURIComponent(rawName) as Route['name'];
+    if (routeNames.has(name)) {
+      return { name, ...Object.fromEntries(new URLSearchParams(rawQuery)) } as Route;
+    }
+  }
   try {
     const saved = window.sessionStorage.getItem(routeStorageKey);
     if (!saved) return { name: 'landing' };
@@ -90,6 +97,12 @@ function restoreRoute(): Route {
   } catch {
     return { name: 'landing' };
   }
+}
+
+function routeUrl(route: Route) {
+  const { name, ...params } = route;
+  const query = new URLSearchParams(params as Record<string, string>).toString();
+  return `#/${encodeURIComponent(name)}${query ? `?${query}` : ''}`;
 }
 
 interface AppState {
@@ -195,6 +208,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const navigate = useCallback((r: Route) => {
     setRoute(r);
+    window.history.pushState({ route: r }, '', routeUrl(r));
     try {
       window.sessionStorage.setItem(routeStorageKey, JSON.stringify(r));
     } catch {
