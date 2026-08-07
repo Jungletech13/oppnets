@@ -1,6 +1,10 @@
+Exit code: 0
+Wall time: 0.9 seconds
+Output:
 import type {
   CollaborationStyle,
   CollaborationSpace,
+  Conversation,
   Compensation,
   Industry,
   MissionDrive,
@@ -8,11 +12,44 @@ import type {
   OpportunityRole,
   OpportunityStage,
   Profile,
+  AppNotification,
   Task,
   WorkStyle,
 } from '@/types';
 
 type Row = Record<string, unknown>;
+
+export function mapConversationRow(row: Row): Conversation {
+  const participants = (row.conversation_participants as Row[]) || [];
+  const messages = ((row.messages as Row[]) || [])
+    .map((message) => ({
+      id: message.id as string,
+      authorId: message.author_id as string,
+      text: (message.text as string) || '',
+      at: (message.at as string) || '',
+    }))
+    .sort((a, b) => a.at.localeCompare(b.at));
+
+  return {
+    id: row.id as string,
+    type: (row.type as Conversation['type']) || 'direct',
+    title: (row.title as string) || 'Conversation',
+    participantIds: participants.map((participant) => participant.user_id as string).filter(Boolean),
+    spaceId: (row.space_id as string) || undefined,
+    messages,
+  };
+}
+
+export function mapNotificationRow(row: Row): AppNotification {
+  return {
+    id: row.id as string,
+    kind: row.kind as AppNotification['kind'],
+    text: (row.text as string) || '',
+    at: (row.at as string) || '',
+    read: (row.read as boolean) ?? false,
+    link: (row.link as string) || undefined,
+  };
+}
 
 export function mapProfileRow(row: Row): Profile {
   return {
@@ -230,3 +267,4 @@ export function opportunityToInsert(opportunity: Opportunity) {
     funding_status: opportunity.dna.fundingStatus,
   };
 }
+
