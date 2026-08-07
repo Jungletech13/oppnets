@@ -12,15 +12,25 @@ export function OpportunityDetailPage({ opportunityId }: { opportunityId: string
   const opp = opportunities.find((o) => o.id === opportunityId);
   const [showConnect, setShowConnect] = useState(false);
   const [created, setCreated] = useState<string | false>(false);
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
 
   if (!opp) {
     return <EmptyState message="Opportunity not found." />;
   }
   const owner = getProfile(opp.ownerId);
 
-  const handleCreateSpace = () => {
-    const id = createSpaceFromOpportunity(opp.id, opp.title, opp.description, [currentUserId, opp.ownerId]);
-    setCreated(id);
+  const handleCreateSpace = async () => {
+    setCreating(true);
+    setCreateError(null);
+    try {
+      const id = await createSpaceFromOpportunity(opp.id, opp.title, opp.description, [currentUserId, opp.ownerId]);
+      setCreated(id);
+    } catch (error) {
+      setCreateError(error instanceof Error ? error.message : 'Could not create the collaboration space.');
+    } finally {
+      setCreating(false);
+    }
   };
 
   return (
@@ -151,6 +161,7 @@ export function OpportunityDetailPage({ opportunityId }: { opportunityId: string
           <div className="space-y-4">
             <BetaNote>This MVP simulates connection and team formation. In production, applications would require owner approval.</BetaNote>
             <p className="text-sm text-ink-600">Starting a collaboration creates a dedicated Collaboration Space for this opportunity with you and the opportunity owner as initial members.</p>
+            {createError && <p className="text-sm text-red-600" role="alert">{createError}</p>}
             {opp.accepts !== 'individuals' && (
               <div className="card p-3">
                 <p className="text-xs font-medium text-ink-700 mb-2">Suggested collaborators to invite:</p>
@@ -167,7 +178,7 @@ export function OpportunityDetailPage({ opportunityId }: { opportunityId: string
             )}
             <div className="flex justify-end gap-2">
               <button onClick={() => setShowConnect(false)} className="btn-secondary">Cancel</button>
-              <button onClick={handleCreateSpace} className="btn-primary">Create Collaboration Space</button>
+              <button onClick={handleCreateSpace} className="btn-primary" disabled={creating}>{creating ? 'Creating...' : 'Create Collaboration Space'}</button>
             </div>
           </div>
         )}

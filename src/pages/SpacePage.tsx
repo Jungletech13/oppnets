@@ -267,7 +267,7 @@ function TasksTab({ space }: { space: CollaborationSpace }) {
         </div>
       )}
 
-      <NewTaskModal open={showNew} onClose={() => setShowNew(false)} space={space} onCreate={(t) => { addTask(space.id, t); setShowNew(false); }} />
+      <NewTaskModal open={showNew} onClose={() => setShowNew(false)} space={space} onCreate={async (task) => { await addTask(space.id, task); setShowNew(false); }} />
     </div>
   );
 }
@@ -491,7 +491,7 @@ function FeedbackForm({ onSubmit, onCancel }: { onSubmit: (fb: { reviewerId: str
   );
 }
 
-function NewTaskModal({ open, onClose, space, onCreate }: { open: boolean; onClose: () => void; space: CollaborationSpace; onCreate: (t: Task) => void }) {
+function NewTaskModal({ open, onClose, space, onCreate }: { open: boolean; onClose: () => void; space: CollaborationSpace; onCreate: (t: Task) => Promise<void> }) {
   const { currentUserId } = useApp();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -500,8 +500,10 @@ function NewTaskModal({ open, onClose, space, onCreate }: { open: boolean; onClo
   const [dueDate, setDueDate] = useState('');
   const [priority, setPriority] = useState<'Low' | 'Medium' | 'High'>('Medium');
   const [checklist, setChecklist] = useState<string[]>(['']);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const create = () => {
+  const create = async () => {
     const task: Task = {
       id: `t-${Date.now()}`, title, description, ownerId, reviewerId,
       dueDate: dueDate || new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10),
@@ -509,8 +511,16 @@ function NewTaskModal({ open, onClose, space, onCreate }: { open: boolean; onClo
       checklist: checklist.filter(Boolean).map((t, i) => ({ id: `c-${Date.now()}-${i}`, text: t, done: false })),
       dependencies: [], comments: [], revisions: [],
     };
-    onCreate(task);
-    setTitle(''); setDescription(''); setChecklist(['']);
+    setSaving(true);
+    setError(null);
+    try {
+      await onCreate(task);
+      setTitle(''); setDescription(''); setChecklist(['']);
+    } catch (createError) {
+      setError(createError instanceof Error ? createError.message : 'Could not create this task.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -537,9 +547,10 @@ function NewTaskModal({ open, onClose, space, onCreate }: { open: boolean; onClo
             <button onClick={() => setChecklist([...checklist, ''])} className="btn-ghost text-sm"><Plus className="w-4 h-4" /> Add item</button>
           </div>
         </Field>
+        {error && <p className="text-sm text-red-600" role="alert">{error}</p>}
         <div className="flex justify-end gap-2">
           <button onClick={onClose} className="btn-secondary">Cancel</button>
-          <button onClick={create} className="btn-primary" disabled={!title}>Create task</button>
+          <button onClick={create} className="btn-primary" disabled={!title || saving}>{saving ? 'Creating...' : 'Create task'}</button>
         </div>
       </div>
     </Modal>

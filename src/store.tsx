@@ -29,11 +29,15 @@ import {
 import { useAuth } from '@/lib/auth';
 import {
   createOpportunity as persistOpportunity,
+  createCollaborationSpace,
+  createTask,
   fetchOpportunities,
   fetchProfiles,
+  fetchUserSpacesWithDetails,
+  updatePersistedTask,
   updateProfile as persistProfile,
 } from '@/lib/queries';
-import { mapOpportunityRow, mapProfileRow, profileToUpdate } from '@/lib/domain-mappers';
+import { mapOpportunityRow, mapProfileRow, mapSpaceRow, profileToUpdate } from '@/lib/domain-mappers';
 
 export type Route =
   | { name: 'landing' }
@@ -83,10 +87,10 @@ interface AppState {
   retryDataLoad: () => void;
   // actions
   createOpportunity: (o: Opportunity) => Promise<Opportunity>;
-  createSpaceFromOpportunity: (oppId: ID, name: string, description: string, memberIds: ID[]) => ID;
+  createSpaceFromOpportunity: (oppId: ID, name: string, description: string, memberIds: ID[]) => Promise<ID>;
   updateSpace: (spaceId: ID, updater: (s: CollaborationSpace) => CollaborationSpace) => void;
-  addTask: (spaceId: ID, task: Task) => void;
-  updateTask: (spaceId: ID, taskId: ID, updater: (t: Task) => Task) => void;
+  addTask: (spaceId: ID, task: Task) => Promise<void>;
+  updateTask: (spaceId: ID, taskId: ID, updater: (t: Task) => Task) => Promise<void>;
   submitForReview: (spaceId: ID, taskId: ID) => void;
   reviewTask: (spaceId: ID, taskId: ID, action: 'approve' | 'changes' | 'discussion', feedback?: Omit<Feedback, 'id' | 'at'>) => void;
   toggleChecklistItem: (spaceId: ID, taskId: ID, itemId: ID) => void;
@@ -149,11 +153,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     let active = true;
     setDataLoading(true);
     setDataError(null);
-    Promise.all([fetchProfiles(), fetchOpportunities()])
-      .then(([profileRows, opportunityRows]) => {
+    Promise.all([fetchProfiles(), fetchOpportunities(), fetchUserSpacesWithDetails(user.id)])
+      .then(([profileRows, opportunityRows, spaceRows]) => {
         if (!active) return;
         setProfiles((profileRows || []).map((row) => mapProfileRow(row as Record<string, unknown>)));
         setOpportunities((opportunityRows || []).map((row) => mapOpportunityRow(row as Record<string, unknown>)));
+        setSpaces((spaceRows || []).filter(Boolean).map((row) => mapSpaceRow(row as Record<string, unknown>)));
       })
       .catch((error: unknown) => {
         if (!active) return;
@@ -179,48 +184,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const createSpaceFromOpportunity = useCallback(
-    (oppId: ID, name: string, description: string, memberIds: ID[]): ID => {
-      const id = uid('cs');
+    async (oppId: ID, name: string, description: string, memberIds: ID[]): Promise<ID> => {
       const opp = opportunities.find((o) => o.id === oppId);
-      const newSpace: CollaborationSpace = {
-        id,
-        opportunityId: oppId,
-        name,
-        description,
-        mission: opp?.description ?? '',
-        successDefinition: '',
-        memberIds,
-        roles: Object.fromEntries(memberIds.map((m, i) => [m, i === 0 ? 'Lead' : 'Contributor'])),
-        tasks: [],
-        milestones: [],
-        files: [],
-        notes: '',
-        decisions: [],
-        activity: [{ id: uid('a'), at: nowISO(), text: 'Space created', actorId: currentUserId }],
-        modules: defaultModules(opp?.category),
-        record: {
-          projectName: name,
-          opportunityCreatorId: opp?.ownerId ?? currentUserId,
-          ideaOrigin: 'Created from an opportunity listing.',
-          beganAt: nowISO().slice(0, 10),
-          participants: memberIds.map((p) => ({
-            profileId: p,
-            role: p === opp?.ownerId ? 'Lead' : 'Contributor',
-            expectedContribution: '',
-            responsibilities: '',
-          })),
-          goals: opp?.goals ?? [],
-          milestones: [],
-          communicationExpectations: 'Weekly check-in, async in team chat.',
-          majorDecisions: [],
-          acknowledgments: [currentUserId],
-        },
-        checkIns: [],
-        checkInFrequency: 'Weekly',
-        nextCheckIn: '',
-      };
+      const row = await createCollaborationSpace({ opportunityId: oppId, name, description, mission: opp?.description ?? '', memberIds });
+      if (!row) throw new Error('Created collaboration space could not be loaded.');
+      const newSpace = mapSpaceRow(row as Record<string, unknown>);
       setSpaces((prev) => [newSpace, ...prev]);
-      return id;
+      return newSpace.id;
     },
     [opportunities, currentUserId]
   );
@@ -229,25 +199,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setSpaces((prev) => prev.map((s) => (s.id === spaceId ? updater(s) : s)));
   }, []);
 
-  const addTask = useCallback((spaceId: ID, task: Task) => {
-    setSpaces((prev) =>
-      prev.map((s) =>
-        s.id === spaceId
-          ? { ...s, tasks: [...s.tasks, task], activity: [{ id: uid('a'), at: nowISO(), text: `Task created: ${task.title}`, actorId: task.ownerId }, ...s.activity] }
-          : s
-      )
-    );
+  const addTask = useCallback(async (spaceId: ID, task: Task) => {
+    const row = await createTask(spaceId, task);
+    if (!row) throw new Error('Created task could not be loaded.');
+    const persistedSpace = mapSpaceRow(row as Record<string, unknown>);
+    setSpaces((prev) => prev.map((space) => (space.id === spaceId ? persistedSpace : space)));
   }, []);
 
-  const updateTask = useCallback((spaceId: ID, taskId: ID, updater: (t: Task) => Task) => {
-    setSpaces((prev) =>
-      prev.map((s) =>
-        s.id === spaceId
-          ? { ...s, tasks: s.tasks.map((t) => (t.id === taskId ? updater(t) : t)) }
-          : s
-      )
-    );
-  }, []);
+  const updateTask = useCallback(async (spaceId: ID, taskId: ID, updater: (t: Task) => Task) => {
+    const task = spaces.find((space) => space.id === spaceId)?.tasks.find((candidate) => candidate.id === taskId);
+    if (!task) throw new Error('Task not found.');
+    const row = await updatePersistedTask(spaceId, updater(task));
+    if (!row) throw new Error('Updated task could not be loaded.');
+    const persistedSpace = mapSpaceRow(row as Record<string, unknown>);
+    setSpaces((prev) => prev.map((space) => (space.id === spaceId ? persistedSpace : space)));
+  }, [spaces]);
 
   const toggleChecklistItem = useCallback((spaceId: ID, taskId: ID, itemId: ID) => {
     updateTask(spaceId, taskId, (t) => ({

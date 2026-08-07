@@ -1,5 +1,6 @@
 import type {
   CollaborationStyle,
+  CollaborationSpace,
   Compensation,
   Industry,
   MissionDrive,
@@ -7,6 +8,7 @@ import type {
   OpportunityRole,
   OpportunityStage,
   Profile,
+  Task,
   WorkStyle,
 } from '@/types';
 
@@ -35,6 +37,98 @@ export function mapProfileRow(row: Row): Profile {
     communityStanding: (row.community_standing as Profile['communityStanding']) || 'neutral',
   };
 }
+
+export function mapSpaceRow(row: Row): CollaborationSpace {
+  const members = (row.space_members as Row[]) || [];
+  const memberIds = members.map((member) => member.user_id as string);
+  const roles = Object.fromEntries(members.map((member) => [member.user_id as string, (member.role as string) || 'Member']));
+  return {
+    id: row.id as string,
+    opportunityId: row.opportunity_id as string,
+    name: row.name as string,
+    description: (row.description as string) || '',
+    mission: (row.mission as string) || '',
+    successDefinition: (row.success_definition as string) || '',
+    memberIds,
+    roles,
+    tasks: ((row.tasks as Row[]) || []).map(mapTaskRow),
+    milestones: ((row.milestones as Row[]) || []).map((milestone) => ({
+      id: milestone.id as string,
+      title: milestone.title as string,
+      dueDate: (milestone.due_date as string) || '',
+      done: (milestone.done as boolean) ?? false,
+    })),
+    files: ((row.space_files as Row[]) || []).map((file) => ({
+      id: file.id as string,
+      name: file.name as string,
+      size: (file.size as string) || '',
+      at: (file.uploaded_at as string) || '',
+    })),
+    notes: (row.notes as string) || '',
+    decisions: ((row.decisions as Row[]) || []).map((decision) => ({
+      id: decision.id as string,
+      title: decision.title as string,
+      decidedAt: (decision.decided_at as string) || '',
+      by: (decision.decided_by as string) || '',
+      rationale: (decision.rationale as string) || '',
+    })),
+    activity: ((row.activity_log as Row[]) || []).map((activity) => ({
+      id: activity.id as string,
+      at: (activity.at as string) || '',
+      text: activity.text as string,
+      actorId: activity.actor_id as string | undefined,
+    })),
+    modules: defaultSpaceModules,
+    record: {
+      projectName: row.name as string,
+      opportunityCreatorId: memberIds[0] || '',
+      ideaOrigin: 'Created from an opportunity listing.',
+      beganAt: ((row.created_at as string) || '').slice(0, 10),
+      participants: memberIds.map((profileId) => ({ profileId, role: roles[profileId], expectedContribution: '', responsibilities: '' })),
+      goals: [],
+      milestones: [],
+      communicationExpectations: '',
+      majorDecisions: [],
+      acknowledgments: [],
+    },
+    checkIns: [],
+    checkInFrequency: (row.check_in_frequency as CollaborationSpace['checkInFrequency']) || 'Weekly',
+    nextCheckIn: (row.next_check_in as string) || '',
+  };
+}
+
+function mapTaskRow(row: Row): Task {
+  return {
+    id: row.id as string,
+    title: row.title as string,
+    description: (row.description as string) || '',
+    ownerId: row.owner_id as string,
+    reviewerId: (row.reviewer_id as string) || '',
+    dueDate: (row.due_date as string) || '',
+    priority: row.priority as Task['priority'],
+    status: row.status as Task['status'],
+    checklist: ((row.checklist_items as Row[]) || []).map((item) => ({
+      id: item.id as string,
+      text: item.label as string,
+      done: (item.done as boolean) ?? false,
+      submittedForReview: (item.submitted_for_review as boolean) ?? false,
+    })),
+    comments: (row.comments as Task['comments']) || [],
+    revisions: (row.revisions as Task['revisions']) || [],
+    feedback: (row.feedback as Task['feedback']) || undefined,
+    dependencies: [],
+  };
+}
+
+const defaultSpaceModules: CollaborationSpace['modules'] = [
+  'team_chat',
+  'tasks',
+  'milestones',
+  'decision_log',
+  'collaboration_record',
+  'notes',
+  'files',
+].map((kind, order) => ({ kind: kind as CollaborationSpace['modules'][number]['kind'], label: kind.replace(/_/g, ' '), pinned: order < 4, visible: true, order }));
 
 export function profileToUpdate(profile: Profile) {
   return {
