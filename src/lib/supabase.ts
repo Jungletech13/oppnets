@@ -14,9 +14,15 @@ const legacyStorageKey = 'oppnets-auth-session';
 const resilientStorage = {
   getItem(key: string) {
     try {
-      return window.localStorage.getItem(key) ?? window.sessionStorage.getItem(key);
+      // Prefer the same-tab copy: browsers can leave a readable but stale
+      // localStorage value when writes are restricted by privacy settings.
+      return window.sessionStorage.getItem(key) ?? window.localStorage.getItem(key);
     } catch {
-      return window.sessionStorage.getItem(key);
+      try {
+        return window.sessionStorage.getItem(key);
+      } catch {
+        return null;
+      }
     }
   },
   setItem(key: string, value: string) {
