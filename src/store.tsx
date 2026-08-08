@@ -1,6 +1,3 @@
-Exit code: 0
-Wall time: 1 seconds
-Output:
 import { createContext, useContext, useState, useCallback, useEffect, useMemo, type ReactNode } from 'react';
 import type {
   Profile,
@@ -36,6 +33,7 @@ import {
   fetchProfiles,
   fetchUserSpacesWithDetails,
   fetchConversations,
+  createDirectConversation,
   fetchNotifications,
   sendMessage as persistMessage,
   markNotificationRead as persistNotificationRead,
@@ -147,7 +145,7 @@ interface AppState {
   setCheckInFrequency: (spaceId: ID, f: CheckInFrequency) => void;
   acknowledgeRecord: (spaceId: ID, profileId: ID) => void;
   sendMessage: (convId: ID, text: string) => Promise<void>;
-  startConversation: (participantIds: ID[], title: string, type?: Conversation['type'], spaceId?: ID) => ID;
+  startConversation: (participantIds: ID[], title: string, type?: Conversation['type'], spaceId?: ID, initialMessage?: string) => Promise<ID>;
   markNotificationRead: (id: ID) => Promise<void>;
   markAllNotificationsRead: () => Promise<void>;
   updateProfile: (p: Profile) => Promise<void>;
@@ -174,6 +172,14 @@ const reportStatus = (status: string): import('./types').Report['status'] => {
     dismissed: 'Dismissed',
   };
   return labels[status] ?? 'Submitted';
+};
+
+const errorMessage = (error: unknown, fallback: string) => {
+  if (error instanceof Error) return error.message;
+  if (error && typeof error === 'object' && 'message' in error && typeof error.message === 'string') {
+    return error.message;
+  }
+  return fallback;
 };
 
 function taskProgress(t: Task): { done: number; total: number; pct: number; approvedPct: number } {
@@ -230,7 +236,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       })
       .catch((error: unknown) => {
         if (!active) return;
-        setDataError(error instanceof Error ? error.message : 'Could not load your OppNets data.');
+        setDataError(errorMessage(error, 'Could not load your OppNets data.'));
       })
       .finally(() => {
         if (active) setDataLoading(false);
@@ -390,14 +396,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     ));
   }, []);
 
-  const startConversation = useCallback((participantIds: ID[], title: string, type: Conversation['type'] = 'group', spaceId?: ID): ID => {
-    const id = uid('conv');
-    setConversations((prev) => [
-      { id, type, title, participantIds: [...participantIds, currentUserId], spaceId, messages: [] },
-      ...prev,
-    ]);
-    return id;
-  }, [currentUserId]);
+  const startConversation = useCallback(async (participantIds: ID[], title: string, type: Conversation['type'] = 'direct', spaceId?: ID, initialMessage = ''): Promise<ID> => {
+    if (type !== 'direct' || participantIds.length !== 1) {
+      throw new Error('Only direct conversations can be started here.');
+    }
+    const row = await createDirectConversation(participantIds[0], title, initialMessage);
+    const conversation = mapConversationRow(row as Record<string, unknown>);
+    setConversations((prev) => [conversation, ...prev.filter((item) => item.id !== conversation.id)]);
+    return conversation.id;
+  }, []);
 
   const markNotificationRead = useCallback(async (id: ID) => {
     await persistNotificationRead(id);
@@ -506,4 +513,3 @@ export const MODULE_PRESETS: Record<string, ModuleKind[]> = {
   'E-commerce Business': ['team_chat', 'tasks', 'milestones', 'customer_pipeline', 'vendors', 'budget', 'decision_log', 'collaboration_record', 'files', 'notes'],
   'General Collaboration': ['team_chat', 'tasks', 'milestones', 'notes', 'files', 'decision_log', 'collaboration_record', 'project_timeline'],
 };
-

@@ -1,6 +1,3 @@
-Exit code: 0
-Wall time: 0.9 seconds
-Output:
 import type {
   CollaborationStyle,
   CollaborationSpace,
@@ -167,7 +164,10 @@ const defaultSpaceModules: CollaborationSpace['modules'] = [
   'collaboration_record',
   'notes',
   'files',
-].map((kind, order) => ({ kind: kind as CollaborationSpace['modules'][number]['kind'], label: kind.replace(/_/g, ' '), pinned: order < 4, visible: true, order }));
+].map((kind, order) => {
+  const label = kind.replace(/_/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
+  return { kind: kind as CollaborationSpace['modules'][number]['kind'], label, pinned: order < 4, visible: true, order };
+});
 
 export function profileToUpdate(profile: Profile) {
   return {
@@ -267,4 +267,3 @@ export function opportunityToInsert(opportunity: Opportunity) {
     funding_status: opportunity.dna.fundingStatus,
   };
 }
-

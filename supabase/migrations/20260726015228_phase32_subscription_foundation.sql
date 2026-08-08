@@ -25,6 +25,32 @@ payment processing, no Stripe, no billing. All pricing is DRAFT and configurable
 - All admin checks use is_admin() from Phase 3.1.
 */
 
+-- Phase 3A used a different, incompatible subscription model keyed by `tier`.
+-- On a clean replay, replace those superseded tables before creating the
+-- authoritative Phase 3.2 model below. The guard keeps this a no-op anywhere
+-- the Phase 3.2 `id`-keyed schema already exists.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'subscription_plans'
+      AND column_name = 'tier'
+  ) AND NOT EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'subscription_plans'
+      AND column_name = 'id'
+  ) THEN
+    DROP TABLE IF EXISTS public.user_subscriptions CASCADE;
+    DROP TABLE IF EXISTS public.plan_entitlements CASCADE;
+    DROP TABLE IF EXISTS public.subscription_plans CASCADE;
+  END IF;
+END
+$$;
+
 -- ============================================================
 -- Table: subscription_plans
 -- ============================================================

@@ -1,6 +1,3 @@
-Exit code: 0
-Wall time: 0.9 seconds
-Output:
 import { useEffect, useState } from 'react';
 import { useApp } from '@/store';
 import { PageHeader } from '@/components/AppShell';
@@ -23,7 +20,7 @@ export function MessagesPage() {
 
   return (
     <div>
-      <PageHeader title="Messages" subtitle="Conversations tied to projects, tasks, and decisions â€” not generic chat." />
+      <PageHeader title="Messages" subtitle="Conversations tied to projects, tasks, and decisions — not generic chat." />
       <div className="grid lg:grid-cols-3 gap-4" style={{ minHeight: 500 }}>
         {/* List */}
         <Card className="p-2 lg:col-span-1">
@@ -75,7 +72,7 @@ export function MessagesPage() {
                     <div key={m.id} className={`flex items-start gap-2 ${isMe ? 'flex-row-reverse' : ''}`}>
                       {author && <Avatar src={author.photoUrl} name={author.name} size={28} />}
                       <div className={`max-w-[70%] ${isMe ? 'text-right' : ''}`}>
-                        <p className="text-xs text-ink-400 mb-0.5">{author?.name?.split(' ')[0]} Â· {new Date(m.at).toLocaleDateString()}</p>
+                        <p className="text-xs text-ink-400 mb-0.5">{author?.name?.split(' ')[0]} · {new Date(m.at).toLocaleDateString()}</p>
                         <div className={`inline-block rounded-lg px-3 py-2 text-sm ${isMe ? 'bg-brand-600 text-white' : 'bg-ink-100 text-ink-800'}`}>{m.text}</div>
                       </div>
                     </div>
@@ -168,5 +165,4 @@ function ActionItemsBar({ space, currentUserId }: { space: import('@/types').Col
     </div>
   );
 }
-
 

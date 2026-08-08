@@ -1,6 +1,3 @@
-Exit code: 0
-Wall time: 1.2 seconds
-Output:
 /*
   # Persistent reports and appeals
 
@@ -65,4 +62,3 @@ REVOKE ALL ON public.user_reports FROM anon;
 REVOKE ALL ON public.moderation_appeals FROM anon;
 GRANT SELECT, INSERT, UPDATE ON public.user_reports TO authenticated;
 GRANT SELECT, INSERT, UPDATE ON public.moderation_appeals TO authenticated;
-

@@ -47,10 +47,9 @@ export function PricingPage() {
 
       <Card className="p-5 mt-5">
         <p className="text-xs text-ink-500 text-center">
-          Pricing architecture only â€” no payment processing yet. Plans will be available when billing is enabled.
+          Pricing architecture only — no payment processing yet. Plans will be available when billing is enabled.
         </p>
       </Card>
     </div>
   );
 }
-

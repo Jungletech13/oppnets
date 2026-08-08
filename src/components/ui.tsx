@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useId, type ReactNode } from 'react';
 import type { VerificationClaim } from '@/types';
 import { CheckCircle2, Clock, AlertTriangle, XCircle, ShieldCheck, Sparkles } from 'lucide-react';
 
@@ -135,16 +135,20 @@ export function Card({ children, className = '', hover = false, onClick, style }
 }
 
 export function Modal({ open, onClose, title, children, wide = false }: { open: boolean; onClose: () => void; title: string; children: ReactNode; wide?: boolean }) {
+  const titleId = useId();
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink-900/40 backdrop-blur-sm" onClick={onClose}>
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
         className={`bg-white rounded-xl shadow-xl border border-ink-200 w-full ${wide ? 'max-w-3xl' : 'max-w-lg'} max-h-[85vh] overflow-y-auto animate-fadein`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-ink-200 sticky top-0 bg-white rounded-t-xl">
-          <h3 className="font-semibold text-ink-900">{title}</h3>
-          <button onClick={onClose} className="text-ink-400 hover:text-ink-700 text-xl leading-none">&times;</button>
+          <h3 id={titleId} className="font-semibold text-ink-900">{title}</h3>
+          <button type="button" aria-label="Close dialog" onClick={onClose} className="text-ink-400 hover:text-ink-700 text-xl leading-none">&times;</button>
         </div>
         <div className="p-5">{children}</div>
       </div>

@@ -1,6 +1,3 @@
-Exit code: 0
-Wall time: 0.6 seconds
-Output:
 import { useEffect, useState } from 'react';
 import { Bell, CreditCard, LogOut, Shield } from 'lucide-react';
 import { useApp } from '@/store';
@@ -132,4 +129,3 @@ export function SettingsPage() {
     </div>
   );
 }
-

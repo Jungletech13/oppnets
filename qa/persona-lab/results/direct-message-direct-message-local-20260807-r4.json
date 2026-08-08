@@ -1,0 +1,25 @@
+{
+  "run_id": "direct-message-local-20260807-r4",
+  "app_url": "http://127.0.0.1:4173/",
+  "supabase_url": "http://127.0.0.1:55321/",
+  "sender": "direct-sender",
+  "recipient": "direct-recipient",
+  "message": "Synthetic cross-user verification direct-message-local-20260807-r4",
+  "checks": {
+    "sender_sees_message_before_refresh": true,
+    "sender_sees_message_after_refresh": true,
+    "recipient_sees_notification": true,
+    "recipient_sees_message": true,
+    "recipient_sees_message_after_refresh": true,
+    "sender_database_sees_message": true,
+    "recipient_database_sees_message": true
+  },
+  "defects": [],
+  "started_at": "2026-08-07T11:33:30.969Z",
+  "sender_messages_before_refresh": "ON\nOpportunityNetwork\nNew Opportunity\nHome\nDiscover Opportunities\nPeople and Teams\nMy Opportunities\nCollaboration Spaces\nMessages\nNotifications\nProfile\nTrust Center\nProfessionals\nCompanies\nBuilder Partners\nSuccess Stories\nResource Center\nPricing\nSettings\nNB\nNew builder\nMessages\n\nConversations tied to projects, tasks, and decisions — not generic chat.\n\nNB\n\nConversation with New builder\n\nSynthetic cross-user verification direct-message-local-20260807-r4\n\nConversation with New builder\nNB\n\nNew · 8/7/2026\n\nSynthetic cross-user verification direct-message-local-20260807-r4",
+  "sender_messages_after_refresh": "ON\nOpportunityNetwork\nNew Opportunity\nHome\nDiscover Opportunities\nPeople and Teams\nMy Opportunities\nCollaboration Spaces\nMessages\nNotifications\nProfile\nTrust Center\nProfessionals\nCompanies\nBuilder Partners\nSuccess Stories\nResource Center\nPricing\nSettings\nNB\nNew builder\nMessages\n\nConversations tied to projects, tasks, and decisions — not generic chat.\n\nConversation with New builder\n\nSynthetic cross-user verification direct-message-local-20260807-r4\n\nConversation with New builder\nNB\n\nNew · 8/7/2026\n\nSynthetic cross-user verification direct-message-local-20260807-r4",
+  "recipient_messages_before_refresh": "ON\nOpportunityNetwork\nNew Opportunity\nHome\nDiscover Opportunities\nPeople and Teams\nMy Opportunities\nCollaboration Spaces\nMessages\nNotifications\n1\nProfile\nTrust Center\nProfessionals\nCompanies\nBuilder Partners\nSuccess Stories\nResource Center\nPricing\nSettings\nNB\nNew builder\nMessages\n\nConversations tied to projects, tasks, and decisions — not generic chat.\n\nConversation with New builder\n\nSynthetic cross-user verification direct-message-local-20260807-r4\n\nConversation with New builder\nNB\n\nNew · 8/7/2026\n\nSynthetic cross-user verification direct-message-local-20260807-r4",
+  "recipient_messages_after_refresh": "ON\nOpportunityNetwork\nNew Opportunity\nHome\nDiscover Opportunities\nPeople and Teams\nMy Opportunities\nCollaboration Spaces\nMessages\nNotifications\n1\nProfile\nTrust Center\nProfessionals\nCompanies\nBuilder Partners\nSuccess Stories\nResource Center\nPricing\nSettings\nNB\nNew builder\nMessages\n\nConversations tied to projects, tasks, and decisions — not generic chat.\n\nConversation with New builder\n\nSynthetic cross-user verification direct-message-local-20260807-r4\n\nConversation with New builder\nNB\n\nNew · 8/7/2026\n\nSynthetic cross-user verification direct-message-local-20260807-r4",
+  "finished_at": "2026-08-07T11:33:40.600Z",
+  "passed": true
+}

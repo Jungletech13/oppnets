@@ -1,6 +1,3 @@
-Exit code: 0
-Wall time: 1.1 seconds
-Output:
 import { useState } from 'react';
 import { useApp } from '@/store';
 import { PageHeader } from '@/components/AppShell';
@@ -124,7 +121,7 @@ export function TrustCenterPage() {
 
           {/* Trust & Verification Architecture */}
           <Card className="p-5">
-            <SectionHeader title="Trust & Verification Architecture" subtitle="Trust is built in layers â€” verifiable facts, not popularity or self-reported claims." />
+            <SectionHeader title="Trust & Verification Architecture" subtitle="Trust is built in layers — verifiable facts, not popularity or self-reported claims." />
             <div className="space-y-3">
               {layers.map((layer) => (
                 <LayerCard key={layer.number} layer={layer} />
@@ -135,7 +132,7 @@ export function TrustCenterPage() {
 
           {/* Claim-level verification status */}
           <Card className="p-5">
-            <SectionHeader title="Claim-level verification" subtitle="Each claim is checked separately. Verification confirms facts â€” not opinions, character, or trustworthiness." />
+            <SectionHeader title="Claim-level verification" subtitle="Each claim is checked separately. Verification confirms facts — not opinions, character, or trustworthiness." />
             <div className="grid sm:grid-cols-2 gap-3">
               {me.verifications.map((v) => (
                 <div key={v.id} className="border border-ink-200 rounded-lg p-3">
@@ -181,7 +178,7 @@ export function TrustCenterPage() {
 
           {/* Collaboration Reviews */}
           <Card className="p-5">
-            <SectionHeader title="Collaboration reviews" subtitle="Reviews are only written by verified participants of the same Collaboration Space. The platform verifies who wrote the review and that a real collaboration occurred â€” not the subjective opinions expressed." />
+            <SectionHeader title="Collaboration reviews" subtitle="Reviews are only written by verified participants of the same Collaboration Space. The platform verifies who wrote the review and that a real collaboration occurred — not the subjective opinions expressed." />
             {reviews.length === 0 ? <p className="text-sm text-ink-500">No collaboration reviews yet. Reviews appear after a verified collaboration ends.</p> : (
               <div className="space-y-2">
                 {reviews.map((r) => (
@@ -270,7 +267,7 @@ export function TrustCenterPage() {
             <div className="space-y-2 text-sm text-ink-600">
               <p className="flex items-start gap-2"><Info className="w-4 h-4 text-brand-500 mt-0.5 shrink-0" /> Verify claims before committing to collaborations.</p>
               <p className="flex items-start gap-2"><Info className="w-4 h-4 text-brand-500 mt-0.5 shrink-0" /> Use Collaboration Records to align expectations.</p>
-              <p className="flex items-start gap-2"><Info className="w-4 h-4 text-brand-500 mt-0.5 shrink-0" /> Report concerns factually â€” do not publicly accuse others.</p>
+              <p className="flex items-start gap-2"><Info className="w-4 h-4 text-brand-500 mt-0.5 shrink-0" /> Report concerns factually — do not publicly accuse others.</p>
               <p className="flex items-start gap-2"><Info className="w-4 h-4 text-brand-500 mt-0.5 shrink-0" /> Keep sensitive details in private conversations.</p>
             </div>
           </Card>
@@ -320,4 +317,3 @@ export function TrustCenterPage() {
     </div>
   );
 }
-

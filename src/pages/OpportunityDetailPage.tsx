@@ -2,32 +2,43 @@ import { useApp } from '@/store';
 import { PageHeader } from '@/components/AppShell';
 import { Badge, Card, Avatar, TrustIndicators, VerificationPill, SectionHeader, Modal, BetaNote } from '@/components/ui';
 import { MatchReasons } from '@/components/OpportunityCard';
-import { MapPin, Clock, Users, Calendar, ShieldCheck, Target, User as UserIcon, Layers, Briefcase, ArrowRight, Plus } from 'lucide-react';
+import { MapPin, Clock, Users, Calendar, ShieldCheck, Target, User as UserIcon, Layers, Briefcase, Plus } from 'lucide-react';
 import { getProfile } from '@/data';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { OpportunityDNA } from '@/types';
+import { applyToOpportunity, fetchApplications } from '@/lib/queries';
 
 export function OpportunityDetailPage({ opportunityId }: { opportunityId: string }) {
-  const { opportunities, navigate, createSpaceFromOpportunity, profiles, currentUserId } = useApp();
+  const { opportunities, navigate, profiles, currentUserId } = useApp();
   const opp = opportunities.find((o) => o.id === opportunityId);
   const [showConnect, setShowConnect] = useState(false);
-  const [created, setCreated] = useState<string | false>(false);
+  const [applicationMessage, setApplicationMessage] = useState('');
+  const [selectedRoleId, setSelectedRoleId] = useState('');
+  const [applicationStatus, setApplicationStatus] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!opp || opp.ownerId === currentUserId) return;
+    void fetchApplications(opp.id).then((rows) => {
+      const mine = rows.find((row) => row.applicant_id === currentUserId);
+      setApplicationStatus((mine?.status as string) || null);
+    }).catch(() => undefined);
+  }, [opp, currentUserId]);
 
   if (!opp) {
     return <EmptyState message="Opportunity not found." />;
   }
   const owner = getProfile(opp.ownerId);
 
-  const handleCreateSpace = async () => {
+  const handleApply = async () => {
     setCreating(true);
     setCreateError(null);
     try {
-      const id = await createSpaceFromOpportunity(opp.id, opp.title, opp.description, [currentUserId, opp.ownerId]);
-      setCreated(id);
+      await applyToOpportunity(opp.id, applicationMessage, selectedRoleId || undefined);
+      setApplicationStatus('pending');
     } catch (error) {
-      setCreateError(error instanceof Error ? error.message : 'Could not create the collaboration space.');
+      setCreateError(error instanceof Error ? error.message : 'Could not submit your application.');
     } finally {
       setCreating(false);
     }
@@ -41,7 +52,11 @@ export function OpportunityDetailPage({ opportunityId }: { opportunityId: string
         subtitle={opp.description}
         action={
           <div className="flex gap-2">
-            <button onClick={() => setShowConnect(true)} className="btn-primary"><Plus className="w-4 h-4" /> Start Collaboration</button>
+            {opp.ownerId !== currentUserId && (
+              <button onClick={() => setShowConnect(true)} className="btn-primary" disabled={applicationStatus === 'pending'}>
+                <Plus className="w-4 h-4" /> {applicationStatus === 'pending' ? 'Application pending' : 'Apply to collaborate'}
+              </button>
+            )}
           </div>
         }
       />
@@ -149,18 +164,29 @@ export function OpportunityDetailPage({ opportunityId }: { opportunityId: string
       </div>
 
       {/* Connect modal */}
-      <Modal open={showConnect} onClose={() => { setShowConnect(false); setCreated(false); }} title={created ? 'Collaboration Space created' : 'Start a collaboration'} wide>
-        {created ? (
+      <Modal open={showConnect} onClose={() => setShowConnect(false)} title={applicationStatus === 'pending' ? 'Application submitted' : 'Apply to collaborate'} wide>
+        {applicationStatus === 'pending' ? (
           <div className="text-center py-4">
             <div className="w-12 h-12 rounded-full bg-accent-50 text-accent-600 flex items-center justify-center mx-auto mb-3"><ShieldCheck className="w-6 h-6" /></div>
-            <h3 className="font-semibold text-ink-900">Your Collaboration Space is ready</h3>
-            <p className="text-sm text-ink-500 mt-1">You and {owner?.name} can now plan tasks, milestones, and reviews together.</p>
-            <button onClick={() => navigate({ name: 'space', spaceId: created as string })} className="btn-primary mt-4">Open Space <ArrowRight className="w-4 h-4" /></button>
+            <h3 className="font-semibold text-ink-900">Your application is pending</h3>
+            <p className="text-sm text-ink-500 mt-1">{owner?.name} will review it. A Collaboration Space will be created only if the application is accepted.</p>
+            <button onClick={() => setShowConnect(false)} className="btn-primary mt-4">Done</button>
           </div>
         ) : (
           <div className="space-y-4">
-            <BetaNote>This MVP simulates connection and team formation. In production, applications would require owner approval.</BetaNote>
-            <p className="text-sm text-ink-600">Starting a collaboration creates a dedicated Collaboration Space for this opportunity with you and the opportunity owner as initial members.</p>
+            <BetaNote>The opportunity owner must accept your application before a Collaboration Space is created.</BetaNote>
+            <p className="text-sm text-ink-600">Share what you can contribute and select the role that best matches your interest.</p>
+            {opp.roles.length > 0 && (
+              <label className="block text-sm font-medium text-ink-700">Role
+                <select className="input mt-1" value={selectedRoleId} onChange={(event) => setSelectedRoleId(event.target.value)}>
+                  <option value="">General collaboration</option>
+                  {opp.roles.map((role) => <option key={role.id} value={role.id}>{role.title}</option>)}
+                </select>
+              </label>
+            )}
+            <label className="block text-sm font-medium text-ink-700">Application message
+              <textarea className="input min-h-[100px] mt-1" value={applicationMessage} onChange={(event) => setApplicationMessage(event.target.value)} placeholder="Explain the experience, contribution, and availability you bring..." />
+            </label>
             {createError && <p className="text-sm text-red-600" role="alert">{createError}</p>}
             {opp.accepts !== 'individuals' && (
               <div className="card p-3">
@@ -178,7 +204,7 @@ export function OpportunityDetailPage({ opportunityId }: { opportunityId: string
             )}
             <div className="flex justify-end gap-2">
               <button onClick={() => setShowConnect(false)} className="btn-secondary">Cancel</button>
-              <button onClick={handleCreateSpace} className="btn-primary" disabled={creating}>{creating ? 'Creating...' : 'Create Collaboration Space'}</button>
+              <button onClick={() => void handleApply()} className="btn-primary" disabled={creating || applicationMessage.trim().length < 20}>{creating ? 'Submitting...' : 'Submit application'}</button>
             </div>
           </div>
         )}

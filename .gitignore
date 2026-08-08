@@ -22,3 +22,13 @@ dist-ssr
 *.sln
 *.sw?
 .env
+
+# Local Supabase CLI state and migration-recovery snapshots
+supabase/.branches/
+supabase/.temp/
+supabase/migrations_backup_before_remote_fetch_*/
+supabase/migrations_legacy_timestamp_archive_*/
+supabase/migrations_remote_fetch_raw_*/
+
+# Persona runs are generated evidence; selected clean runs may be force-added.
+qa/persona-lab/results/

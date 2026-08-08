@@ -2,14 +2,50 @@ import { useApp } from '@/store';
 import { PageHeader } from '@/components/AppShell';
 import { OpportunityCard } from '@/components/OpportunityCard';
 import { Card, SectionHeader, EmptyState, Badge, Avatar, ProgressBar } from '@/components/ui';
-import { Briefcase, LayoutDashboard, Plus, ArrowRight } from 'lucide-react';
+import { Briefcase, LayoutDashboard, Plus, ArrowRight, Users } from 'lucide-react';
 import { getProfile } from '@/data';
+import { useEffect, useState } from 'react';
+import { decideOpportunityApplication, fetchApplications } from '@/lib/queries';
+
+interface OpportunityApplicationRow {
+  id: string;
+  opportunity_id: string;
+  applicant_id: string;
+  role_id?: string | null;
+  message?: string;
+  status: string;
+  applied_at?: string;
+}
 
 export function MyOpportunitiesPage() {
-  const { opportunities, spaces, currentUserId, navigate } = useApp();
+  const { opportunities, spaces, profiles, currentUserId, navigate, retryDataLoad } = useApp();
+  const [applications, setApplications] = useState<OpportunityApplicationRow[]>([]);
+  const [decisionError, setDecisionError] = useState<string | null>(null);
+  const [decidingId, setDecidingId] = useState<string | null>(null);
 
   const myPosted = opportunities.filter((o) => o.ownerId === currentUserId);
   const mySpaces = spaces.filter((s) => s.memberIds.includes(currentUserId));
+
+  useEffect(() => {
+    const posted = opportunities.filter((opportunity) => opportunity.ownerId === currentUserId);
+    void Promise.all(posted.map((opportunity) => fetchApplications(opportunity.id)))
+      .then((rows) => setApplications(rows.flat().filter((row) => row.status === 'pending') as OpportunityApplicationRow[]))
+      .catch((error) => setDecisionError(error instanceof Error ? error.message : 'Could not load applications.'));
+  }, [opportunities, currentUserId]);
+
+  const decide = async (applicationId: string, decision: 'accepted' | 'rejected') => {
+    setDecidingId(applicationId);
+    setDecisionError(null);
+    try {
+      await decideOpportunityApplication(applicationId, decision);
+      setApplications((current) => current.filter((application) => application.id !== applicationId));
+      if (decision === 'accepted') retryDataLoad();
+    } catch (error) {
+      setDecisionError(error instanceof Error ? error.message : 'Could not update the application.');
+    } finally {
+      setDecidingId(null);
+    }
+  };
 
   return (
     <div>
@@ -22,6 +58,38 @@ export function MyOpportunitiesPage() {
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {myPosted.map((o) => <OpportunityCard key={o.id} opp={o} />)}
+          </div>
+        )}
+      </section>
+
+      <section className="mb-8">
+        <SectionHeader title="Pending applications" subtitle="Review each request before creating a shared workspace." />
+        {decisionError && <p role="alert" className="text-sm text-red-600 mb-3">{decisionError}</p>}
+        {applications.length === 0 ? (
+          <EmptyState icon={<Users className="w-5 h-5" />} title="No pending applications" description="New collaboration requests will appear here." />
+        ) : (
+          <div className="space-y-3">
+            {applications.map((application) => {
+              const applicant = profiles.find((profile) => profile.id === application.applicant_id);
+              const opportunity = opportunities.find((item) => item.id === application.opportunity_id);
+              const role = opportunity?.roles.find((item) => item.id === application.role_id);
+              return (
+                <Card key={application.id} className="p-4">
+                  <div className="flex flex-col sm:flex-row sm:items-start gap-3">
+                    <Avatar src={applicant?.photoUrl || ''} name={applicant?.name || 'Applicant'} size={40} />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-ink-900">{applicant?.name || 'Applicant'}</p>
+                      <p className="text-xs text-ink-500">Applied to {opportunity?.title || 'your opportunity'}{role ? ` · ${role.title}` : ''}</p>
+                      <p className="text-sm text-ink-700 mt-2 whitespace-pre-wrap">{application.message || 'No application message provided.'}</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <button className="btn-secondary" disabled={decidingId === application.id} onClick={() => void decide(application.id, 'rejected')}>Decline</button>
+                      <button className="btn-primary" disabled={decidingId === application.id} onClick={() => void decide(application.id, 'accepted')}>{decidingId === application.id ? 'Saving...' : 'Accept'}</button>
+                    </div>
+                  </div>
+                </Card>
+              );
+            })}
           </div>
         )}
       </section>

@@ -52,9 +52,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const { data } = await supabase.auth.getSession();
         let restoredSession = data.session;
+        const refreshToken = readRefreshToken();
 
         if (!restoredSession) {
-          const refreshToken = readRefreshToken();
           if (refreshToken) {
             const { data: refreshed } = await supabase.auth.refreshSession({ refresh_token: refreshToken });
             restoredSession = refreshed.session;
@@ -107,4 +107,3 @@ export function useAuth() {
   if (!ctx) throw new Error('useAuth must be used within AuthProvider');
   return ctx;
 }
-
