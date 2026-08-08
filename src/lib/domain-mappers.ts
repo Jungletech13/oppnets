@@ -1,6 +1,7 @@
 import type {
   CollaborationStyle,
   CollaborationSpace,
+  Conversation,
   Compensation,
   Industry,
   MissionDrive,
@@ -8,11 +9,44 @@ import type {
   OpportunityRole,
   OpportunityStage,
   Profile,
+  AppNotification,
   Task,
   WorkStyle,
 } from '@/types';
 
 type Row = Record<string, unknown>;
+
+export function mapConversationRow(row: Row): Conversation {
+  const participants = (row.conversation_participants as Row[]) || [];
+  const messages = ((row.messages as Row[]) || [])
+    .map((message) => ({
+      id: message.id as string,
+      authorId: message.author_id as string,
+      text: (message.text as string) || '',
+      at: (message.at as string) || '',
+    }))
+    .sort((a, b) => a.at.localeCompare(b.at));
+
+  return {
+    id: row.id as string,
+    type: (row.type as Conversation['type']) || 'direct',
+    title: (row.title as string) || 'Conversation',
+    participantIds: participants.map((participant) => participant.user_id as string).filter(Boolean),
+    spaceId: (row.space_id as string) || undefined,
+    messages,
+  };
+}
+
+export function mapNotificationRow(row: Row): AppNotification {
+  return {
+    id: row.id as string,
+    kind: row.kind as AppNotification['kind'],
+    text: (row.text as string) || '',
+    at: (row.at as string) || '',
+    read: (row.read as boolean) ?? false,
+    link: (row.link as string) || undefined,
+  };
+}
 
 export function mapProfileRow(row: Row): Profile {
   return {
@@ -22,11 +56,13 @@ export function mapProfileRow(row: Row): Profile {
     location: (row.location as string) || '',
     headline: (row.headline as string) || '',
     bio: (row.bio as string) || '',
-    skills: [],
-    interests: (row.what_im_looking_for as string[]) || [],
-    industries: [],
-    availability: 'Available',
-    timeCommitment: 'Part-time',
+    skills: (row.skills as string[]) || [],
+    interests: ((row.interests as string[]) || []).length
+      ? (row.interests as string[])
+      : (row.what_im_looking_for as string[]) || [],
+    industries: (row.industries as Industry[]) || [],
+    availability: (row.availability as Profile['availability']) || 'Available',
+    timeCommitment: (row.time_commitment as Profile['timeCommitment']) || 'Not specified',
     opportunitiesSought: (row.what_im_looking_for as string[]) || [],
     buildingIds: [],
     ventureHistory: [],
@@ -128,7 +164,10 @@ const defaultSpaceModules: CollaborationSpace['modules'] = [
   'collaboration_record',
   'notes',
   'files',
-].map((kind, order) => ({ kind: kind as CollaborationSpace['modules'][number]['kind'], label: kind.replace(/_/g, ' '), pinned: order < 4, visible: true, order }));
+].map((kind, order) => {
+  const label = kind.replace(/_/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
+  return { kind: kind as CollaborationSpace['modules'][number]['kind'], label, pinned: order < 4, visible: true, order };
+});
 
 export function profileToUpdate(profile: Profile) {
   return {
@@ -137,6 +176,11 @@ export function profileToUpdate(profile: Profile) {
     bio: profile.bio,
     location: profile.location,
     photo_url: profile.photoUrl,
+    skills: profile.skills,
+    interests: profile.interests,
+    industries: profile.industries,
+    availability: profile.availability,
+    time_commitment: profile.timeCommitment,
     what_im_building: profile.buildingIds,
     what_im_looking_for: profile.opportunitiesSought,
   };

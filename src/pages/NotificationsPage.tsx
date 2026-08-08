@@ -94,6 +94,7 @@ export function NotificationsPage() {
 
 function parseLink(link: string): import('@/store').Route {
   if (link.startsWith('space:')) return { name: 'space', spaceId: link.slice(6) };
+  if (link.startsWith('opportunity:')) return { name: 'opportunity', opportunityId: link.slice(12) };
   if (link === 'messages') return { name: 'messages' };
   if (link === 'discover') return { name: 'discover' };
   return { name: 'home' };

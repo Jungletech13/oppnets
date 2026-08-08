@@ -1,0 +1,102 @@
+{
+  "run_id": "stateful-local-20260807-r5",
+  "local_only": true,
+  "personas": [
+    {
+      "role": "creator",
+      "id": "61d579eb-2a8b-4ad2-9a7b-ec160bf72661"
+    },
+    {
+      "role": "collaborator",
+      "id": "72a38b9e-7f82-412f-97a4-f49505941ec9"
+    }
+  ],
+  "checks": {
+    "creator_sees_published_opportunity": true,
+    "opportunity_survives_creator_refresh": true,
+    "opportunity_persisted": true,
+    "collaborator_created_space": true,
+    "space_survives_collaborator_refresh": true,
+    "task_created": true,
+    "task_survives_refresh": true,
+    "report_visible_in_trust_center": false,
+    "appeal_status_visible": true,
+    "owner_can_open_shared_space": true,
+    "owner_sees_shared_task": true
+  },
+  "positive_feedback": [
+    {
+      "check": "creator_sees_published_opportunity",
+      "evidence": "Visible in isolated browser or authenticated database session."
+    },
+    {
+      "check": "opportunity_survives_creator_refresh",
+      "evidence": "Visible in isolated browser or authenticated database session."
+    },
+    {
+      "check": "opportunity_persisted",
+      "evidence": "Visible in isolated browser or authenticated database session."
+    },
+    {
+      "check": "collaborator_created_space",
+      "evidence": "Visible in isolated browser or authenticated database session."
+    },
+    {
+      "check": "space_survives_collaborator_refresh",
+      "evidence": "Visible in isolated browser or authenticated database session."
+    },
+    {
+      "check": "task_created",
+      "evidence": "Visible in isolated browser or authenticated database session."
+    },
+    {
+      "check": "task_survives_refresh",
+      "evidence": "Visible in isolated browser or authenticated database session."
+    },
+    {
+      "check": "appeal_status_visible",
+      "evidence": "Visible in isolated browser or authenticated database session."
+    },
+    {
+      "check": "owner_can_open_shared_space",
+      "evidence": "Visible in isolated browser or authenticated database session."
+    },
+    {
+      "check": "owner_sees_shared_task",
+      "evidence": "Visible in isolated browser or authenticated database session."
+    }
+  ],
+  "negative_feedback": [
+    {
+      "check": "report_visible_in_trust_center",
+      "evidence": "Expected persisted state was not visible."
+    }
+  ],
+  "improvement_suggestions": [
+    {
+      "priority": "High",
+      "suggestion": "Replace immediate collaboration-space creation with an explicit application, owner review, accept/decline, and notification workflow."
+    },
+    {
+      "priority": "High",
+      "suggestion": "Add visible save confirmations and recovery guidance to every mutation."
+    },
+    {
+      "priority": "Medium",
+      "suggestion": "Expose a workflow history showing actor, timestamp, review state, and evidence status."
+    }
+  ],
+  "defects": [
+    {
+      "severity": "P2",
+      "title": "report visible in trust center",
+      "evidence": "Expected local persisted state was not visible."
+    }
+  ],
+  "limitations": [
+    "The current MVP skips an owner application/approval step and lets a viewer create a collaboration space immediately."
+  ],
+  "started_at": "2026-08-07T12:23:47.782Z",
+  "passed": false,
+  "finished_at": "2026-08-07T12:24:41.354Z"
+}

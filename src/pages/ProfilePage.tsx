@@ -21,6 +21,7 @@ export function ProfilePage({ profileId }: { profileId?: string }) {
   const isMe = id === currentUserId;
   const [showMessage, setShowMessage] = useState(false);
   const [showReport, setShowReport] = useState(false);
+  const [reportSuccess, setReportSuccess] = useState(false);
   const [editing, setEditing] = useState(false);
   const [verifiedCollabCount, setVerifiedCollabCount] = useState<number | null>(null);
 
@@ -250,14 +251,24 @@ export function ProfilePage({ profileId }: { profileId?: string }) {
         </div>
       </div>
 
+      {reportSuccess && (
+        <div role="status" className="mb-4 rounded-lg border border-accent-200 bg-accent-50 px-4 py-3 text-sm text-accent-800">
+          Report submitted. Our moderation team will review it.
+        </div>
+      )}
+
       {/* Message modal */}
       <Modal open={showMessage} onClose={() => setShowMessage(false)} title={`Message ${profile.name}`}>
-        <MessageComposer onSend={(text) => { startConversation([profile.id], `Conversation with ${profile.name}`, 'direct'); setShowMessage(false); }} />
+        <MessageComposer onSend={async (text) => {
+          await startConversation([profile.id], `Conversation with ${profile.name}`, 'direct', undefined, text);
+          setShowMessage(false);
+          navigate({ name: 'messages' });
+        }} />
       </Modal>
 
       {/* Report modal */}
       <Modal open={showReport} onClose={() => setShowReport(false)} title="Report this user">
-        <ReportForm onSubmit={(reason) => { reportUser(profile.id, reason); setShowReport(false); }} />
+        <ReportForm onSubmit={async (reason) => { await reportUser(profile.id, reason); setShowReport(false); setReportSuccess(true); }} />
       </Modal>
 
       {/* Edit modal */}
@@ -282,23 +293,51 @@ function VentureRow({ v }: { v: VentureOutcome }) {
   );
 }
 
-function MessageComposer({ onSend }: { onSend: (text: string) => void }) {
+function MessageComposer({ onSend }: { onSend: (text: string) => Promise<void> }) {
   const [text, setText] = useState('');
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const submit = async () => {
+    setSending(true);
+    setError(null);
+    try {
+      await onSend(text.trim());
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not send the message.');
+    } finally {
+      setSending(false);
+    }
+  };
   return (
     <div className="space-y-3">
-      <Field label="Message"><textarea className="input min-h-[80px]" value={text} onChange={(e) => setText(e.target.value)} placeholder="Introduce yourself and your opportunity..." /></Field>
-      <div className="flex justify-end"><button onClick={() => text && onSend(text)} className="btn-primary" disabled={!text}>Send</button></div>
+      <Field label="Message"><textarea className="input min-h-[80px]" value={text} disabled={sending} onChange={(e) => setText(e.target.value)} placeholder="Introduce yourself and your opportunity..." /></Field>
+      {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
+      <div className="flex justify-end"><button onClick={() => void submit()} className="btn-primary" disabled={sending || !text.trim()}>{sending ? 'Sending...' : 'Send'}</button></div>
     </div>
   );
 }
 
-function ReportForm({ onSubmit }: { onSubmit: (reason: string) => void }) {
+function ReportForm({ onSubmit }: { onSubmit: (reason: string) => Promise<void> }) {
   const [reason, setReason] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const submit = async () => {
+    setSubmitting(true);
+    setError(null);
+    try {
+      await onSubmit(reason);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not submit the report.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
   return (
     <div className="space-y-3">
       <p className="text-sm text-ink-500">Reports are reviewed by moderation. Use factual language.</p>
       <Field label="Reason"><textarea className="input min-h-[80px]" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Describe the concern factually..." /></Field>
-      <div className="flex justify-end"><button onClick={() => reason && onSubmit(reason)} className="btn-primary" disabled={!reason}>Submit report</button></div>
+      {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
+      <div className="flex justify-end"><button onClick={() => void submit()} className="btn-primary" disabled={submitting || reason.trim().length < 10}>{submitting ? 'Submitting...' : 'Submit report'}</button></div>
     </div>
   );
 }
@@ -329,7 +368,10 @@ function EditProfileForm({ profile, onSave }: { profile: Profile; onSave: () => 
         <Field label="Location"><input className="input" value={p.location} onChange={(e) => setP({ ...p, location: e.target.value })} /></Field>
         <Field label="Availability"><select className="input" value={p.availability} onChange={(e) => setP({ ...p, availability: e.target.value as Profile['availability'] })}><option>Available</option><option>Limited</option><option>Unavailable</option></select></Field>
       </div>
+      <Field label="Time commitment"><select className="input" value={p.timeCommitment} onChange={(e) => setP({ ...p, timeCommitment: e.target.value as Profile['timeCommitment'] })}><option>Not specified</option><option>Light</option><option>Part-time</option><option>Full-time</option></select></Field>
       <Field label="Skills (comma separated)"><input className="input" value={p.skills.join(', ')} onChange={(e) => setP({ ...p, skills: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) })} /></Field>
+      <Field label="Industries (comma separated)"><input className="input" value={p.industries.join(', ')} onChange={(e) => setP({ ...p, industries: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) as Profile['industries'] })} placeholder="Technology, Finance, Consulting" /></Field>
+      <Field label="Interests (comma separated)"><input className="input" value={p.interests.join(', ')} onChange={(e) => setP({ ...p, interests: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) })} placeholder="Venture partnerships, AI products, community impact" /></Field>
       {error && <p className="text-sm text-red-600" role="alert">{error}</p>}
       <div className="flex justify-end"><button onClick={save} className="btn-primary" disabled={saving}>{saving ? 'Saving...' : 'Save'}</button></div>
     </div>

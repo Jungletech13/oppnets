@@ -22,8 +22,6 @@ import type {
 import {
   GROUPS,
   SPACES,
-  CONVERSATIONS,
-  NOTIFICATIONS,
   MY_TRUST,
 } from './data';
 import { useAuth } from '@/lib/auth';
@@ -34,10 +32,20 @@ import {
   fetchOpportunities,
   fetchProfiles,
   fetchUserSpacesWithDetails,
+  fetchConversations,
+  createDirectConversation,
+  fetchNotifications,
+  sendMessage as persistMessage,
+  markNotificationRead as persistNotificationRead,
+  markAllNotificationsRead as persistAllNotificationsRead,
+  fetchUserReports,
+  fetchUserAppeals,
+  submitUserReport,
+  submitModerationAppeal,
   updatePersistedTask,
   updateProfile as persistProfile,
 } from '@/lib/queries';
-import { mapOpportunityRow, mapProfileRow, mapSpaceRow, profileToUpdate } from '@/lib/domain-mappers';
+import { mapConversationRow, mapNotificationRow, mapOpportunityRow, mapProfileRow, mapSpaceRow, profileToUpdate } from '@/lib/domain-mappers';
 
 export type Route =
   | { name: 'landing' }
@@ -71,6 +79,40 @@ export type Route =
   | { name: 'admin-audit' }
   | { name: 'admin-subscriptions' };
 
+const routeStorageKey = 'oppnets:last-route';
+const routeNames = new Set<Route['name']>([
+  'landing', 'home', 'discover', 'people', 'my-opportunities', 'space', 'messages',
+  'notifications', 'profile', 'trust', 'settings', 'opportunity', 'create-opportunity',
+  'toolkit', 'professionals', 'professional', 'companies', 'company', 'partners',
+  'pricing', 'success-stories', 'resources', 'resource', 'admin', 'admin-users',
+  'admin-verification', 'admin-moderation', 'admin-collaborations', 'admin-audit',
+  'admin-subscriptions',
+]);
+
+function restoreRoute(): Route {
+  if (window.location.hash.startsWith('#/')) {
+    const [rawName, rawQuery = ''] = window.location.hash.slice(2).split('?');
+    const name = decodeURIComponent(rawName) as Route['name'];
+    if (routeNames.has(name)) {
+      return { name, ...Object.fromEntries(new URLSearchParams(rawQuery)) } as Route;
+    }
+  }
+  try {
+    const saved = window.sessionStorage.getItem(routeStorageKey);
+    if (!saved) return { name: 'landing' };
+    const parsed = JSON.parse(saved) as Partial<Route>;
+    return parsed.name && routeNames.has(parsed.name) ? parsed as Route : { name: 'landing' };
+  } catch {
+    return { name: 'landing' };
+  }
+}
+
+function routeUrl(route: Route) {
+  const { name, ...params } = route;
+  const query = new URLSearchParams(params as Record<string, string>).toString();
+  return `#/${encodeURIComponent(name)}${query ? `?${query}` : ''}`;
+}
+
 interface AppState {
   route: Route;
   navigate: (r: Route) => void;
@@ -102,13 +144,14 @@ interface AppState {
   addCheckIn: (spaceId: ID, ci: CheckIn) => void;
   setCheckInFrequency: (spaceId: ID, f: CheckInFrequency) => void;
   acknowledgeRecord: (spaceId: ID, profileId: ID) => void;
-  sendMessage: (convId: ID, text: string) => void;
-  startConversation: (participantIds: ID[], title: string, type?: Conversation['type'], spaceId?: ID) => ID;
-  markNotificationRead: (id: ID) => void;
-  markAllNotificationsRead: () => void;
+  sendMessage: (convId: ID, text: string) => Promise<void>;
+  startConversation: (participantIds: ID[], title: string, type?: Conversation['type'], spaceId?: ID, initialMessage?: string) => Promise<ID>;
+  markNotificationRead: (id: ID) => Promise<void>;
+  markAllNotificationsRead: () => Promise<void>;
   updateProfile: (p: Profile) => Promise<void>;
-  reportUser: (targetId: ID, reason: string) => void;
-  reportOpportunity: (targetId: ID, reason: string) => void;
+  reportUser: (targetId: ID, reason: string) => Promise<void>;
+  reportOpportunity: (targetId: ID, reason: string) => Promise<void>;
+  submitAppeal: (decision: string, reason: string) => Promise<void>;
 }
 
 const Ctx = createContext<AppState | null>(null);
@@ -121,6 +164,23 @@ export function useApp() {
 
 const uid = (p: string) => `${p}-${Math.random().toString(36).slice(2, 9)}`;
 const nowISO = () => new Date().toISOString();
+const reportStatus = (status: string): import('./types').Report['status'] => {
+  const labels: Record<string, import('./types').Report['status']> = {
+    submitted: 'Submitted',
+    under_review: 'Under review',
+    resolved: 'Resolved',
+    dismissed: 'Dismissed',
+  };
+  return labels[status] ?? 'Submitted';
+};
+
+const errorMessage = (error: unknown, fallback: string) => {
+  if (error instanceof Error) return error.message;
+  if (error && typeof error === 'object' && 'message' in error && typeof error.message === 'string') {
+    return error.message;
+  }
+  return fallback;
+};
 
 function taskProgress(t: Task): { done: number; total: number; pct: number; approvedPct: number } {
   const total = t.checklist.length;
@@ -135,13 +195,13 @@ export { taskProgress };
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
-  const [route, setRoute] = useState<Route>({ name: 'landing' });
+  const [route, setRoute] = useState<Route>(restoreRoute);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [groups] = useState<CollaborationGroup[]>(GROUPS);
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [spaces, setSpaces] = useState<CollaborationSpace[]>(SPACES);
-  const [conversations, setConversations] = useState<Conversation[]>(CONVERSATIONS);
-  const [notifications, setNotifications] = useState<AppNotification[]>(NOTIFICATIONS);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [trust, setTrust] = useState<TrustState>(MY_TRUST);
   const [dataLoading, setDataLoading] = useState(true);
   const [dataError, setDataError] = useState<string | null>(null);
@@ -153,16 +213,30 @@ export function AppProvider({ children }: { children: ReactNode }) {
     let active = true;
     setDataLoading(true);
     setDataError(null);
-    Promise.all([fetchProfiles(), fetchOpportunities(), fetchUserSpacesWithDetails(user.id)])
-      .then(([profileRows, opportunityRows, spaceRows]) => {
+    Promise.all([fetchProfiles(), fetchOpportunities(), fetchUserSpacesWithDetails(user.id), fetchConversations(user.id), fetchNotifications(user.id), fetchUserReports(user.id), fetchUserAppeals(user.id)])
+      .then(([profileRows, opportunityRows, spaceRows, conversationRows, notificationRows, reportRows, appealRows]) => {
         if (!active) return;
         setProfiles((profileRows || []).map((row) => mapProfileRow(row as Record<string, unknown>)));
         setOpportunities((opportunityRows || []).map((row) => mapOpportunityRow(row as Record<string, unknown>)));
         setSpaces((spaceRows || []).filter(Boolean).map((row) => mapSpaceRow(row as Record<string, unknown>)));
+        setConversations((conversationRows || []).map((row) => mapConversationRow(row as Record<string, unknown>)));
+        setNotifications((notificationRows || []).map((row) => mapNotificationRow(row as Record<string, unknown>)));
+        setTrust((current) => ({
+          ...current,
+          reports: (reportRows || []).map((row) => ({
+            id: row.id as string,
+            targetType: row.target_type as 'user' | 'opportunity',
+            targetId: row.target_id as string,
+            reason: row.reason as string,
+            status: reportStatus(row.status as string),
+            at: row.created_at as string,
+          })),
+          appealStatus: appealRows?.[0] ? reportStatus(appealRows[0].status as string) : undefined,
+        }));
       })
       .catch((error: unknown) => {
         if (!active) return;
-        setDataError(error instanceof Error ? error.message : 'Could not load your OppNets data.');
+        setDataError(errorMessage(error, 'Could not load your OppNets data.'));
       })
       .finally(() => {
         if (active) setDataLoading(false);
@@ -170,10 +244,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => { active = false; };
   }, [user, loadVersion]);
 
+  useEffect(() => {
+    const restoreFromUrl = () => setRoute(restoreRoute());
+    window.addEventListener('popstate', restoreFromUrl);
+    window.addEventListener('hashchange', restoreFromUrl);
+    return () => {
+      window.removeEventListener('popstate', restoreFromUrl);
+      window.removeEventListener('hashchange', restoreFromUrl);
+    };
+  }, []);
+
   const retryDataLoad = useCallback(() => setLoadVersion((version) => version + 1), []);
 
   const navigate = useCallback((r: Route) => {
     setRoute(r);
+    window.history.pushState({ route: r }, '', routeUrl(r));
+    try {
+      window.sessionStorage.setItem(routeStorageKey, JSON.stringify(r));
+    } catch {
+      // Navigation still works when browser storage is restricted.
+    }
     window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
   }, []);
 
@@ -297,50 +387,59 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }));
   }, [updateSpace]);
 
-  const sendMessage = useCallback((convId: ID, text: string) => {
-    setConversations((prev) =>
-      prev.map((c) =>
-        c.id === convId
-          ? { ...c, messages: [...c.messages, { id: uid('msg'), authorId: currentUserId, text, at: nowISO() }] }
-          : c
-      )
-    );
-  }, [currentUserId]);
+  const sendMessage = useCallback(async (convId: ID, text: string) => {
+    const row = await persistMessage(convId, text.trim());
+    if (!row) throw new Error('Message could not be saved.');
+    const message = { id: row.id as string, authorId: row.author_id as string, text: row.text as string, at: row.at as string };
+    setConversations((prev) => prev.map((conversation) =>
+      conversation.id === convId ? { ...conversation, messages: [...conversation.messages, message] } : conversation
+    ));
+  }, []);
 
-  const startConversation = useCallback((participantIds: ID[], title: string, type: Conversation['type'] = 'group', spaceId?: ID): ID => {
-    const id = uid('conv');
-    setConversations((prev) => [
-      { id, type, title, participantIds: [...participantIds, currentUserId], spaceId, messages: [] },
-      ...prev,
-    ]);
-    return id;
-  }, [currentUserId]);
+  const startConversation = useCallback(async (participantIds: ID[], title: string, type: Conversation['type'] = 'direct', spaceId?: ID, initialMessage = ''): Promise<ID> => {
+    if (type !== 'direct' || participantIds.length !== 1) {
+      throw new Error('Only direct conversations can be started here.');
+    }
+    const row = await createDirectConversation(participantIds[0], title, initialMessage);
+    const conversation = mapConversationRow(row as Record<string, unknown>);
+    setConversations((prev) => [conversation, ...prev.filter((item) => item.id !== conversation.id)]);
+    return conversation.id;
+  }, []);
 
-  const markNotificationRead = useCallback((id: ID) => {
+  const markNotificationRead = useCallback(async (id: ID) => {
+    await persistNotificationRead(id);
     setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
   }, []);
 
-  const markAllNotificationsRead = useCallback(() => {
+  const markAllNotificationsRead = useCallback(async () => {
+    await persistAllNotificationsRead(currentUserId);
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-  }, []);
+  }, [currentUserId]);
 
   const updateProfile = useCallback(async (p: Profile) => {
     await persistProfile(p.id, profileToUpdate(p));
     setProfiles((prev) => prev.map((x) => (x.id === p.id ? p : x)));
   }, []);
 
-  const reportUser = useCallback((targetId: ID, reason: string) => {
+  const reportUser = useCallback(async (targetId: ID, reason: string) => {
+    const row = await submitUserReport('user', targetId, reason);
     setTrust((prev) => ({
       ...prev,
-      reports: [...prev.reports, { id: uid('rep'), targetType: 'user', targetId, reason, status: 'Submitted', at: nowISO() }],
+      reports: [{ id: row.id as string, targetType: 'user', targetId, reason: row.reason as string, status: reportStatus(row.status as string), at: row.created_at as string }, ...prev.reports],
     }));
   }, []);
 
-  const reportOpportunity = useCallback((targetId: ID, reason: string) => {
+  const reportOpportunity = useCallback(async (targetId: ID, reason: string) => {
+    const row = await submitUserReport('opportunity', targetId, reason);
     setTrust((prev) => ({
       ...prev,
-      reports: [...prev.reports, { id: uid('rep'), targetType: 'opportunity', targetId, reason, status: 'Submitted', at: nowISO() }],
+      reports: [{ id: row.id as string, targetType: 'opportunity', targetId, reason: row.reason as string, status: reportStatus(row.status as string), at: row.created_at as string }, ...prev.reports],
     }));
+  }, []);
+
+  const submitAppeal = useCallback(async (decision: string, reason: string) => {
+    const row = await submitModerationAppeal(decision, reason);
+    setTrust((prev) => ({ ...prev, appealStatus: reportStatus(row.status as string) }));
   }, []);
 
   const value = useMemo<AppState>(
@@ -350,14 +449,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
       createOpportunity, createSpaceFromOpportunity, updateSpace, addTask, updateTask, submitForReview, reviewTask,
       toggleChecklistItem, toggleChecklistReview, updateModules, addMilestone, toggleMilestone, addDecision, addCheckIn,
       setCheckInFrequency, acknowledgeRecord, sendMessage, startConversation, markNotificationRead, markAllNotificationsRead,
-      updateProfile, reportUser, reportOpportunity,
+      updateProfile, reportUser, reportOpportunity, submitAppeal,
     }),
     [route, navigate, currentUserId, profiles, groups, opportunities, spaces, conversations, notifications, trust,
      dataLoading, dataError, retryDataLoad,
      createOpportunity, createSpaceFromOpportunity, updateSpace, addTask, updateTask, submitForReview, reviewTask,
      toggleChecklistItem, toggleChecklistReview, updateModules, addMilestone, toggleMilestone, addDecision, addCheckIn,
      setCheckInFrequency, acknowledgeRecord, sendMessage, startConversation, markNotificationRead, markAllNotificationsRead,
-     updateProfile, reportUser, reportOpportunity]
+     updateProfile, reportUser, reportOpportunity, submitAppeal]
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

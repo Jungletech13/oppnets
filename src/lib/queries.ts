@@ -115,33 +115,16 @@ export async function createCollaborationSpace(input: {
   mission: string;
   memberIds: string[];
 }) {
-  const { data: space, error } = await supabase
-    .from('collaboration_spaces')
-    .insert({
-      opportunity_id: input.opportunityId,
-      name: input.name,
-      description: input.description,
-      mission: input.mission,
-    })
-    .select()
-    .maybeSingle();
+  const { data: spaceId, error } = await supabase.rpc('create_collaboration_space', {
+    p_opportunity_id: input.opportunityId,
+    p_name: input.name,
+    p_description: input.description,
+    p_mission: input.mission,
+  });
   if (error) throw error;
-  if (!space) throw new Error('Collaboration space was created without a returned record.');
+  if (!spaceId) throw new Error('Collaboration space was created without a returned identifier.');
 
-  const memberIds = [...new Set(input.memberIds)];
-  const { error: memberError } = await supabase.from('space_members').insert(
-    memberIds.map((userId, index) => ({
-      space_id: space.id,
-      user_id: userId,
-      role: index === 0 ? 'Lead' : 'Contributor',
-    }))
-  );
-  if (memberError) {
-    await supabase.from('collaboration_spaces').delete().eq('id', space.id);
-    throw memberError;
-  }
-
-  return fetchSpace(space.id);
+  return fetchSpace(spaceId as string);
 }
 
 export async function createTask(spaceId: string, task: Task) {
@@ -225,6 +208,25 @@ export async function fetchConversations(userId: string) {
   return data;
 }
 
+export async function createDirectConversation(recipientId: string, title: string, initialMessage: string) {
+  const { data: conversationId, error } = await supabase.rpc('create_direct_conversation', {
+    p_recipient_id: recipientId,
+    p_title: title,
+    p_initial_message: initialMessage,
+  });
+  if (error) throw error;
+  if (!conversationId) throw new Error('Conversation was created without an identifier.');
+
+  const { data, error: fetchError } = await supabase
+    .from('conversations')
+    .select('*, conversation_participants(user_id), messages(*)')
+    .eq('id', conversationId)
+    .maybeSingle();
+  if (fetchError) throw fetchError;
+  if (!data) throw new Error('Created conversation could not be reloaded.');
+  return data;
+}
+
 export async function sendMessage(conversationId: string, text: string) {
   const { data, error } = await supabase
     .from('messages')
@@ -260,6 +262,46 @@ export async function markAllNotificationsRead(userId: string) {
     .eq('user_id', userId)
     .eq('read', false);
   if (error) throw error;
+}
+
+export async function fetchUserReports(userId: string) {
+  const { data, error } = await supabase
+    .from('user_reports')
+    .select('*')
+    .eq('reporter_id', userId)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data;
+}
+
+export async function submitUserReport(targetType: 'user' | 'opportunity', targetId: string, reason: string) {
+  const { data, error } = await supabase
+    .from('user_reports')
+    .insert({ target_type: targetType, target_id: targetId, reason: reason.trim() })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function fetchUserAppeals(userId: string) {
+  const { data, error } = await supabase
+    .from('moderation_appeals')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data;
+}
+
+export async function submitModerationAppeal(decision: string, reason: string) {
+  const { data, error } = await supabase
+    .from('moderation_appeals')
+    .insert({ decision: decision.trim(), reason: reason.trim() })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
 }
 
 export async function fetchVerificationClaims(userId: string) {
@@ -313,13 +355,22 @@ export async function fetchApplications(opportunityId: string) {
 }
 
 export async function applyToOpportunity(opportunityId: string, message: string, roleId?: string) {
-  const { data, error } = await supabase
-    .from('opportunity_applications')
-    .insert({ opportunity_id: opportunityId, message, role_id: roleId })
-    .select()
-    .maybeSingle();
+  const { data, error } = await supabase.rpc('submit_opportunity_application', {
+    p_opportunity_id: opportunityId,
+    p_message: message,
+    p_role_id: roleId || null,
+  });
   if (error) throw error;
   return data;
+}
+
+export async function decideOpportunityApplication(applicationId: string, decision: 'accepted' | 'rejected') {
+  const { data, error } = await supabase.rpc('decide_opportunity_application', {
+    p_application_id: applicationId,
+    p_decision: decision,
+  });
+  if (error) throw error;
+  return data as string | null;
 }
 
 export async function subscribeToMessages(conversationId: string, callback: (payload: unknown) => void) {

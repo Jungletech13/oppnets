@@ -85,9 +85,13 @@ function ReviewRow({ review }: { review: CollaborationReview }) {
 }
 
 export function TrustCenterPage() {
-  const { profiles, currentUserId, trust } = useApp();
+  const { profiles, currentUserId, trust, submitAppeal } = useApp();
   const me = profiles.find((p) => p.id === currentUserId)!;
   const [showAppeal, setShowAppeal] = useState(false);
+  const [appealDecision, setAppealDecision] = useState('');
+  const [appealReason, setAppealReason] = useState('');
+  const [appealSubmitting, setAppealSubmitting] = useState(false);
+  const [appealError, setAppealError] = useState<string | null>(null);
 
   const verifiedCount = me.verifications.filter((v) => v.state === 'verified').length;
   const pendingCount = me.verifications.filter((v) => v.state === 'pending').length;
@@ -220,7 +224,7 @@ export function TrustCenterPage() {
                       <Badge tone="amber">{r.status}</Badge>
                     </div>
                     <p className="text-xs text-ink-600 mt-1">{r.reason}</p>
-                    <p className="text-xs text-ink-400 mt-1">{r.at}</p>
+                    <p className="text-xs text-ink-400 mt-1">{new Date(r.at).toLocaleString()}</p>
                   </div>
                 ))}
               </div>
@@ -233,7 +237,6 @@ export function TrustCenterPage() {
             <p className="text-sm text-ink-500 mb-3">If you believe a moderation decision was wrong, you can submit an appeal.</p>
             <button onClick={() => setShowAppeal(true)} className="btn-secondary"><FileWarning className="w-4 h-4" /> Submit appeal</button>
             {trust.appealStatus && <p className="text-sm text-ink-600 mt-2">Appeal status: {trust.appealStatus}</p>}
-            <BetaNote>Appeals are a placeholder in this MVP.</BetaNote>
           </Card>
         </div>
 
@@ -289,9 +292,26 @@ export function TrustCenterPage() {
 
       <Modal open={showAppeal} onClose={() => setShowAppeal(false)} title="Submit an appeal">
         <div className="space-y-3">
-          <Field label="What decision are you appealing?"><textarea className="input min-h-[80px]" placeholder="Describe the decision..." /></Field>
-          <Field label="Why should it be reconsidered?"><textarea className="input min-h-[80px]" placeholder="Provide factual context..." /></Field>
-          <div className="flex justify-end gap-2"><button onClick={() => setShowAppeal(false)} className="btn-secondary">Cancel</button><button onClick={() => setShowAppeal(false)} className="btn-primary">Submit</button></div>
+          <Field label="What decision are you appealing?"><textarea className="input min-h-[80px]" value={appealDecision} onChange={(event) => setAppealDecision(event.target.value)} placeholder="Describe the decision..." /></Field>
+          <Field label="Why should it be reconsidered?"><textarea className="input min-h-[80px]" value={appealReason} onChange={(event) => setAppealReason(event.target.value)} placeholder="Provide factual context..." /></Field>
+          {appealError && <p role="alert" className="text-sm text-red-600">{appealError}</p>}
+          <div className="flex justify-end gap-2">
+            <button onClick={() => setShowAppeal(false)} className="btn-secondary" disabled={appealSubmitting}>Cancel</button>
+            <button onClick={async () => {
+              setAppealSubmitting(true);
+              setAppealError(null);
+              try {
+                await submitAppeal(appealDecision, appealReason);
+                setAppealDecision('');
+                setAppealReason('');
+                setShowAppeal(false);
+              } catch (error) {
+                setAppealError(error instanceof Error ? error.message : 'Could not submit the appeal.');
+              } finally {
+                setAppealSubmitting(false);
+              }
+            }} disabled={appealSubmitting || appealDecision.trim().length < 5 || appealReason.trim().length < 10} className="btn-primary">{appealSubmitting ? 'Submitting...' : 'Submit'}</button>
+          </div>
         </div>
       </Modal>
     </div>

@@ -98,7 +98,7 @@ export interface Profile {
   interests: string[];
   industries: Industry[];
   availability: 'Available' | 'Limited' | 'Unavailable';
-  timeCommitment: 'Light' | 'Part-time' | 'Full-time';
+  timeCommitment: 'Not specified' | 'Light' | 'Part-time' | 'Full-time';
   opportunitiesSought: string[];
   buildingIds: ID[];
   ventureHistory: VentureOutcome[];

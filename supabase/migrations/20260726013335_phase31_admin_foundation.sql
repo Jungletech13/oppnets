@@ -81,6 +81,15 @@ CREATE TABLE IF NOT EXISTS admin_audit_log (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
+-- Compatibility for databases that already received the earlier Phase 3
+-- admin_audit_log shape (`detail` / `at`). CREATE TABLE IF NOT EXISTS does not
+-- add columns to an existing table, so make the Phase 3.1 contract explicit.
+ALTER TABLE admin_audit_log
+  ADD COLUMN IF NOT EXISTS reason text DEFAULT '',
+  ADD COLUMN IF NOT EXISTS previous_state jsonb,
+  ADD COLUMN IF NOT EXISTS new_state jsonb,
+  ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
+
 ALTER TABLE admin_audit_log ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "admin_audit_select" ON admin_audit_log;
