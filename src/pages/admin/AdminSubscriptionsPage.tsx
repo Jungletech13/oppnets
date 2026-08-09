@@ -312,6 +312,7 @@ function EntitlementsTab({ entitlements, plans, onError }: { entitlements: Entit
     { key: 'max_collaboration_spaces', label: 'Max Collaboration Spaces' },
     { key: 'max_team_members', label: 'Max Team Members' },
     { key: 'max_messages_per_day', label: 'Max Messages/Day' },
+    { key: 'max_ai_actions_per_month', label: 'Max AI Suggestions/Month' },
     { key: 'storage_limit_mb', label: 'Storage (MB)' },
     { key: 'max_professional_listings', label: 'Max Professional Listings' },
     { key: 'max_company_pages', label: 'Max Company Pages' },

@@ -4,7 +4,8 @@ import { PageHeader } from '@/components/AppShell';
 import { Card, Badge, Field, Modal, BetaNote } from '@/components/ui';
 import { OpportunityCard } from '@/components/OpportunityCard';
 import { Check, Eye, ArrowRight, ArrowLeft, Plus, X, Sparkles, Save, RotateCcw } from 'lucide-react';
-import type { Opportunity, OpportunityRole, Industry, OpportunityStage, Compensation, OpportunityDNA } from '@/types';
+import type { Opportunity, OpportunityRole, Industry, OpportunityStage, Compensation } from '@/types';
+import { consumeUsage } from '@/lib/subscription-queries';
 
 const CATEGORIES: Industry[] = ['Real Estate', 'Cleaning & Services', 'Nonprofit', 'Technology', 'Film & Media', 'E-commerce', 'Food & Restaurant', 'Finance', 'Consulting', 'Community', 'Creative'];
 const STAGES: OpportunityStage[] = ['Idea', 'Recruiting', 'Planning', 'Building', 'Operating', 'Growing', 'Paused', 'Completed', 'Archived'];
@@ -65,6 +66,8 @@ export function CreateOpportunityPage() {
   const [draftRestored, setDraftRestored] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
+  const [aiBusyField, setAiBusyField] = useState<string | null>(null);
+  const [aiUsageMessage, setAiUsageMessage] = useState<string | null>(null);
 
   const [form, setForm] = useState(() => {
     const draft = loadDraft();
@@ -77,6 +80,26 @@ export function CreateOpportunityPage() {
   useEffect(() => { saveDraft(form); }, [form]);
 
   const valid = step < 4 ? true : form.title && form.description && form.location;
+
+  const applyAISuggestion = async (field: 'title' | 'description' | 'creatorBrings') => {
+    setAiBusyField(field);
+    setAiUsageMessage(null);
+    try {
+      const usage = await consumeUsage('ai_actions');
+      if (!usage.allowed) {
+        setAiUsageMessage(usage.limit === 0
+          ? 'AI suggestions are not included in your current plan. View plans to upgrade.'
+          : `You have used all ${usage.limit} AI suggestions for this month.`);
+        return;
+      }
+      set(field, generateAISuggestion(field, form) || form[field]);
+      setAiUsageMessage(`${usage.remaining ?? 0} of ${usage.limit} AI suggestions remain this month.`);
+    } catch (error) {
+      setAiUsageMessage(error instanceof Error ? error.message : 'Could not use an AI suggestion right now.');
+    } finally {
+      setAiBusyField(null);
+    }
+  };
 
   const buildOpportunity = (): Opportunity => ({
     id: `o-${Date.now()}`,
@@ -163,15 +186,16 @@ export function CreateOpportunityPage() {
             <Field label="Opportunity name" hint="Be specific — a clear title helps the right people find you.">
               <div className="flex gap-2">
                 <input className="input flex-1" value={form.title} onChange={(e) => set('title', e.target.value)} placeholder="e.g. House-flipping partnership in East Austin" />
-                <button onClick={() => set('title', generateAISuggestion('title', form) || form.title)} className="btn-secondary text-xs whitespace-nowrap"><Sparkles className="w-3.5 h-3.5" /> Suggest</button>
+                <button type="button" onClick={() => applyAISuggestion('title')} disabled={!!aiBusyField} className="btn-secondary text-xs whitespace-nowrap disabled:opacity-50"><Sparkles className="w-3.5 h-3.5" /> {aiBusyField === 'title' ? 'Working...' : 'Suggest'}</button>
               </div>
             </Field>
             <Field label="Description" hint="Describe what exists, what you need, and what success looks like. This is your pitch to potential collaborators.">
               <div className="flex gap-2 items-start">
                 <textarea className="input min-h-[100px] flex-1" value={form.description} onChange={(e) => set('description', e.target.value)} placeholder="Describe the opportunity, what exists, and what you need." />
-                <button onClick={() => set('description', generateAISuggestion('description', form) || form.description)} className="btn-secondary text-xs whitespace-nowrap mt-1"><Sparkles className="w-3.5 h-3.5" /> Suggest</button>
+                <button type="button" onClick={() => applyAISuggestion('description')} disabled={!!aiBusyField} className="btn-secondary text-xs whitespace-nowrap mt-1 disabled:opacity-50"><Sparkles className="w-3.5 h-3.5" /> {aiBusyField === 'description' ? 'Working...' : 'Suggest'}</button>
               </div>
             </Field>
+            {aiUsageMessage && <p role="status" className="text-xs text-ink-600">{aiUsageMessage}</p>}
             <div className="grid sm:grid-cols-2 gap-4">
               <Field label="Category" hint="Choose the industry that best fits your opportunity."><select className="input" value={form.category} onChange={(e) => set('category', e.target.value as Industry)}>{CATEGORIES.map((c) => <option key={c}>{c}</option>)}</select></Field>
               <Field label="Current stage" hint="Where is this project right now?"><select className="input" value={form.stage} onChange={(e) => set('stage', e.target.value as OpportunityStage)}>{STAGES.map((s) => <option key={s}>{s}</option>)}</select></Field>
@@ -193,9 +217,10 @@ export function CreateOpportunityPage() {
             <Field label="What you bring" hint="Assets, capital, skills, access, or progress you already have. Be specific — this builds trust.">
               <div className="flex gap-2 items-start">
                 <textarea className="input flex-1" value={form.creatorBrings} onChange={(e) => set('creatorBrings', e.target.value)} placeholder="Assets, capital, skills, access, or progress you already have." />
-                <button onClick={() => set('creatorBrings', generateAISuggestion('creatorBrings', form) || form.creatorBrings)} className="btn-secondary text-xs whitespace-nowrap mt-1"><Sparkles className="w-3.5 h-3.5" /> Suggest</button>
+                <button type="button" onClick={() => applyAISuggestion('creatorBrings')} disabled={!!aiBusyField} className="btn-secondary text-xs whitespace-nowrap mt-1 disabled:opacity-50"><Sparkles className="w-3.5 h-3.5" /> {aiBusyField === 'creatorBrings' ? 'Working...' : 'Suggest'}</button>
               </div>
             </Field>
+            {aiUsageMessage && <p role="status" className="text-xs text-ink-600">{aiUsageMessage}</p>}
             <div className="grid sm:grid-cols-2 gap-4">
               <Field label="Compensation structure" hint="How will collaborators be rewarded?"><select className="input" value={form.compensation} onChange={(e) => set('compensation', e.target.value as Compensation)}>{COMPENSATIONS.map((c) => <option key={c}>{c}</option>)}</select></Field>
               <Field label="Accepts"><select className="input" value={form.accepts} onChange={(e) => set('accepts', e.target.value as 'individuals' | 'groups' | 'both')}><option value="both">Individuals and groups</option><option value="individuals">Individuals only</option><option value="groups">Groups only</option></select></Field>

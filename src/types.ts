@@ -636,6 +636,7 @@ export interface PlanEntitlements {
   storage_limit_mb: number;
   max_professional_listings: number;
   max_company_pages: number;
+  max_ai_actions_per_month: number;
   ai_access: boolean;
   advanced_search: boolean;
   analytics_access: boolean;

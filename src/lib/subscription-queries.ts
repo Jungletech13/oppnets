@@ -274,3 +274,23 @@ export async function adminUpdateCostFactor(
   });
   if (error) throw error;
 }
+
+export interface UsageMetric { used?: number; limit: number; remaining?: number; reset_at?: string; }
+export interface UsageLimits {
+  plan_slug: string; active_opportunities: UsageMetric; ai_actions: UsageMetric;
+  collaboration_spaces: UsageMetric; team_members: UsageMetric;
+  messages_per_day: UsageMetric; storage_mb: UsageMetric;
+}
+export interface UsageResult extends UsageMetric { allowed: boolean; current: number; metric: string; }
+
+export async function fetchMyUsageLimits(): Promise<UsageLimits> {
+  const { data, error } = await supabase.rpc('get_my_usage_limits');
+  if (error) throw error;
+  return data as UsageLimits;
+}
+
+export async function consumeUsage(metric: 'ai_actions', amount = 1): Promise<UsageResult> {
+  const { data, error } = await supabase.rpc('consume_usage', { p_metric_key: metric, p_amount: amount });
+  if (error) throw error;
+  return data as UsageResult;
+}

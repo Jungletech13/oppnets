@@ -5,6 +5,11 @@ import { PageHeader } from '@/components/AppShell';
 import { Badge, Card, Field, SectionHeader } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { useMembership } from '@/lib/use-membership';
+import { fetchMyUsageLimits, type UsageLimits } from '@/lib/subscription-queries';
+
+function formatStorage(megabytes: number) {
+  return megabytes >= 1024 ? `${megabytes / 1024} GB` : `${megabytes} MB`;
+}
 
 export function SettingsPage() {
   const { currentUserId, profiles, updateProfile, navigate } = useApp();
@@ -14,10 +19,20 @@ export function SettingsPage() {
   const [name, setName] = useState('');
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
+  const [usage, setUsage] = useState<UsageLimits | null>(null);
+  const [usageError, setUsageError] = useState<string | null>(null);
 
   useEffect(() => {
     if (me) setName(me.name);
   }, [me]);
+
+  useEffect(() => {
+    let active = true;
+    fetchMyUsageLimits()
+      .then((result) => { if (active) setUsage(result); })
+      .catch(() => { if (active) setUsageError('Usage details are temporarily unavailable.'); });
+    return () => { active = false; };
+  }, []);
 
   const saveAccount = async () => {
     if (!me || !name.trim()) {
@@ -69,6 +84,22 @@ export function SettingsPage() {
               </div>
               <button onClick={() => navigate({ name: 'pricing' })} className="btn-secondary">View plans</button>
             </div>
+          )}
+        </Card>
+
+        <Card className="p-5">
+          <SectionHeader title="Plan usage" />
+          {usage ? (
+            <div className="grid sm:grid-cols-2 gap-3 text-sm">
+              <UsageLine label="Active opportunities" value={`${usage.active_opportunities.used ?? 0} of ${usage.active_opportunities.limit}`} />
+              <UsageLine label="AI suggestions this month" value={`${usage.ai_actions.used ?? 0} of ${usage.ai_actions.limit}`} />
+              <UsageLine label="Collaboration spaces" value={`Up to ${usage.collaboration_spaces.limit}`} />
+              <UsageLine label="Members per space" value={`Up to ${usage.team_members.limit}`} />
+              <UsageLine label="Messages per day" value={`${usage.messages_per_day.limit}`} />
+              <UsageLine label="Storage" value={formatStorage(usage.storage_mb.limit)} />
+            </div>
+          ) : (
+            <p className="text-sm text-ink-500">{usageError ?? 'Loading usage limits...'}</p>
           )}
         </Card>
 
@@ -126,6 +157,15 @@ export function SettingsPage() {
           <p className="text-sm text-ink-500">This MVP now persists authenticated profiles, opportunities, collaboration spaces, and task review workflows in Supabase. Messaging, notifications, file storage, trust verification, and some workspace tools remain simulated.</p>
         </Card>
       </div>
+    </div>
+  );
+}
+
+function UsageLine({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between rounded-lg border border-ink-200 px-3 py-2">
+      <span className="text-ink-600">{label}</span>
+      <span className="font-medium text-ink-900">{value}</span>
     </div>
   );
 }
