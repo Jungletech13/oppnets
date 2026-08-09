@@ -59,15 +59,15 @@ export function PricingPage() {
           const display = prices[plan.tier] ?? [plan.price, plan.period];
           const current = currentPlan?.slug === plan.tier;
           return (
-            <Card key={plan.tier} className={`p-5 flex flex-col ${plan.highlighted ? 'border-brand-400 border-2 ring-2 ring-brand-100' : ''}`}>
-              {plan.highlighted && <div className="flex items-center gap-1 text-xs text-brand-600 font-medium mb-2"><Sparkles className="w-3.5 h-3.5" /> Most popular</div>}
+            <Card key={plan.tier} className="p-5 flex flex-col">
+              {plan.highlighted && <div className="inline-flex self-start items-center gap-1 rounded-full bg-brand-50 px-2 py-1 text-xs text-brand-700 font-medium mb-2"><Sparkles className="w-3.5 h-3.5" /> Most popular</div>}
               <h3 className="text-sm font-semibold text-ink-900">{plan.name}</h3>
               <div className="flex items-baseline gap-1 mt-1 mb-1"><span className="text-2xl font-bold text-ink-900">{display[0]}</span><span className="text-xs text-ink-500">/{display[1]}</span></div>
               <p className="text-xs text-ink-500 mb-4">{plan.description}</p>
               <div className="space-y-2 flex-1 mb-4">
                 {plan.features.map((feature) => <div key={feature.label} className="flex items-start gap-2 text-xs">{feature.included ? <Check className="w-4 h-4 text-accent-600 shrink-0 mt-0.5" /> : <X className="w-4 h-4 text-ink-300 shrink-0 mt-0.5" />}<span className={feature.included ? 'text-ink-700' : 'text-ink-400'}>{feature.label}</span></div>)}
               </div>
-              <button className={plan.highlighted && !current ? 'btn-primary w-full' : 'btn-secondary w-full'} disabled={loading || current || isFree || starting !== null} onClick={() => checkout(priceKey)}>
+              <button className="btn-secondary w-full" disabled={loading || current || isFree || starting !== null} onClick={() => checkout(priceKey)}>
                 {loading ? 'Checking plan...' : current ? 'Current plan' : isFree ? 'Included' : starting === priceKey ? 'Opening Stripe...' : `Choose ${plan.name}`}
               </button>
             </Card>
