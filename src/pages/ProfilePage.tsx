@@ -6,6 +6,7 @@ import { getProfile, getSpace } from '@/data';
 import { useState, useEffect } from 'react';
 import { fetchVerifiedCollaborationCount } from '@/lib/trust-queries';
 import type { Profile, VentureOutcome } from '@/types';
+import { startCheckout } from '@/lib/billing';
 
 const outcomeTone: Record<string, 'accent' | 'brand' | 'amber' | 'neutral' | 'slate'> = {
   Active: 'brand', Completed: 'accent', Launched: 'accent', Operating: 'brand', Acquired: 'accent',
@@ -263,7 +264,7 @@ export function ProfilePage({ profileId }: { profileId?: string }) {
           await startConversation([profile.id], `Conversation with ${profile.name}`, 'direct', undefined, text);
           setShowMessage(false);
           navigate({ name: 'messages' });
-        }} />
+        }} onBuyIntroduction={() => startCheckout('introduction-single')} />
       </Modal>
 
       {/* Report modal */}
@@ -293,7 +294,7 @@ function VentureRow({ v }: { v: VentureOutcome }) {
   );
 }
 
-function MessageComposer({ onSend }: { onSend: (text: string) => Promise<void> }) {
+function MessageComposer({ onSend, onBuyIntroduction }: { onSend: (text: string) => Promise<void>; onBuyIntroduction: () => Promise<void> }) {
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -310,9 +311,15 @@ function MessageComposer({ onSend }: { onSend: (text: string) => Promise<void> }
   };
   return (
     <div className="space-y-3">
+      <div className="rounded-lg border border-brand-200 bg-brand-50 p-3 text-xs text-ink-700">
+        Keep the conversation inside OppNets to preserve a verifiable protection record. OppNets Protection provides records and review tools, not insurance or a guaranteed outcome.
+      </div>
       <Field label="Message"><textarea className="input min-h-[80px]" value={text} disabled={sending} onChange={(e) => setText(e.target.value)} placeholder="Introduce yourself and your opportunity..." /></Field>
       {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
-      <div className="flex justify-end"><button onClick={() => void submit()} className="btn-primary" disabled={sending || !text.trim()}>{sending ? 'Sending...' : 'Send'}</button></div>
+      <div className="flex flex-wrap justify-between gap-2">
+        <button onClick={() => void onBuyIntroduction()} className="btn-secondary" disabled={sending}>Buy an introduction - $4</button>
+        <button onClick={() => void submit()} className="btn-primary" disabled={sending || !text.trim()}>{sending ? 'Sending...' : 'Send introduction'}</button>
+      </div>
     </div>
   );
 }
