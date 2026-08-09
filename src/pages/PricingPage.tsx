@@ -7,6 +7,8 @@ import { useMembership } from '@/lib/use-membership';
 import { startCheckout } from '@/lib/billing';
 
 const addOns = [
+  { key: 'introduction-single', name: 'Verified Introduction', detail: 'Open one protected OppNets conversation', price: '$4' },
+  { key: 'introduction-pack-5', name: 'Introduction Pack', detail: 'Open five protected OppNets conversations', price: '$15' },
   { key: 'spotlight-7d', name: 'Opportunity Spotlight', detail: 'Featured placement for 7 days', price: '$29' },
   { key: 'spotlight-plus-30d', name: 'Spotlight Plus', detail: 'Priority placement for 30 days', price: '$69' },
   { key: 'pro-listing-boost-30d', name: 'Professional Listing Boost', detail: 'Boost a professional listing for 30 days', price: '$39' },
