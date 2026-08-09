@@ -185,6 +185,17 @@ Deno.serve(async (request) => {
           updated_at: new Date().toISOString(),
         }, { onConflict: 'stripe_checkout_session_id' });
         requireNoError(purchaseError, 'Record add-on purchase');
+
+        if (priceKey === 'introduction-single' || priceKey === 'introduction-pack-5') {
+          const creditsPerUnit = priceKey === 'introduction-pack-5' ? 5 : 1;
+          const purchasedQuantity = Number.isInteger(quantity) && quantity > 0 ? quantity : 1;
+          const { error: creditError } = await supabase.rpc('grant_introduction_credits', {
+            p_user_id: userId,
+            p_amount: creditsPerUnit * purchasedQuantity,
+            p_source: session.id,
+          });
+          requireNoError(creditError, 'Grant introduction credits');
+        }
       }
     }
 
