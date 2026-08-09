@@ -377,7 +377,9 @@ export const PRICING_PLANS: PricingPlan[] = [
     period: 'forever',
     description: 'Core networking and collaboration tools for every builder.',
     features: [
-      { label: 'Create and post opportunities', included: true },
+      { label: 'Browse all public opportunities', included: true },
+      { label: '2 opportunity applications per month', included: true },
+      { label: 'Paid introductions available', included: true },
       { label: 'Browse and connect with builders', included: true },
       { label: 'Join collaboration spaces', included: true },
       { label: 'Messaging and tasks', included: true },
@@ -398,6 +400,9 @@ export const PRICING_PLANS: PricingPlan[] = [
     description: 'AI-powered tools and advanced visibility for serious builders.',
     features: [
       { label: 'Everything in Builder Free', included: true },
+      { label: '15 applications and 20 introductions per month', included: true },
+      { label: '5 active opportunities, 5 spaces, and 1 GB storage', included: true },
+      { label: 'OppNets Protection record', included: true },
       { label: 'AI opportunity suggestions', included: true },
       { label: 'Advanced search and matching', included: true },
       { label: 'Priority placement in discovery', included: true },
@@ -418,6 +423,9 @@ export const PRICING_PLANS: PricingPlan[] = [
     description: 'For service providers who want to grow their client base.',
     features: [
       { label: 'Everything in Builder Pro', included: true },
+      { label: '40 applications and 75 introductions per month', included: true },
+      { label: '15 active opportunities, 15 spaces, and 5 GB storage', included: true },
+      { label: 'Protection evidence export and priority review', included: true },
       { label: 'Verified business profile', included: true },
       { label: 'Lead generation tools', included: true },
       { label: 'Premium placement in marketplace', included: true },
@@ -438,6 +446,10 @@ export const PRICING_PLANS: PricingPlan[] = [
     description: 'For companies building teams and posting opportunities at scale.',
     features: [
       { label: 'Everything in Professional', included: true },
+      { label: '100 pooled applications and 200 introductions per month', included: true },
+      { label: '50 active opportunities, 50 spaces, and 25 GB storage', included: true },
+      { label: '10 included team members', included: true },
+      { label: 'Organization protection record and audit history', included: true },
       { label: 'Multiple team members', included: true },
       { label: 'Admin tools and roles', included: true },
       { label: 'Recruiting and hiring tools', included: true },
