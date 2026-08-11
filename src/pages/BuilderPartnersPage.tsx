@@ -17,8 +17,8 @@ export function BuilderPartnersPage() {
 
   return (
     <div>
-      <PageHeader title="Builder Resources" subtitle="Examples of business-tool categories that may support a venture." />
-      <div className="mb-5"><BetaNote>Illustrative directory only. OppNets does not currently claim a partnership, endorsement, discount, or active member offer from the companies shown.</BetaNote></div>
+      <PageHeader title="Builder Resources" subtitle="Business-tool categories that may support a venture." />
+      <div className="mb-5"><BetaNote>Resource categories only. Provider listings and member offers will appear only after they are reviewed and configured by OppNets.</BetaNote></div>
 
       <div className="flex flex-wrap gap-2 mb-5">
         {CATEGORIES.map((c) => (

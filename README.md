@@ -12,7 +12,7 @@ OppNets is **The Opportunity Network**: a trust-first platform for discovering o
 - Production target: Cloudflare Pages connected directly to this GitHub repository
 - Email delivery: Omar's Resend account and the verified `oppnets.com` domain
 
-OppNets has no required Bolt runtime, hosting, asset, database, or deployment dependency.
+OppNets has no required proprietary website-builder runtime, hosting, asset, database, or deployment dependency.
 
 ## Local development
 
@@ -52,4 +52,4 @@ The approved [OppNets Trust Constitution](docs/governance/OPPNETS-TRUST-CONSTITU
 
 ## Operations
 
-See [Independent Operations](docs/operations/INDEPENDENT-OPERATIONS.md) for deployment, environment, rollback, backup, and final separation procedures. The handoff archive has been received and assessed in the [Bolt Handoff Verification](docs/operations/BOLT-HANDOFF-VERIFICATION-2026-08-06.md); the original request is retained only as a historical record.
+See [Independent Operations](docs/operations/INDEPENDENT-OPERATIONS.md) for deployment, environment, rollback, backup, and final separation procedures. Historical handoff records remain in `docs/operations` until the independent production cutover is verified.

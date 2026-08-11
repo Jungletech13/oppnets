@@ -7,6 +7,12 @@ import { Search, Users, ShieldCheck } from 'lucide-react';
 import type { GroupKind } from '@/types';
 import { groupMatchesKind, showGroupsForKind, showIndividualsForKind } from '@/lib/people-directory';
 
+const GROUP_SECTION_TITLES: Record<Exclude<GroupKind, 'individual'>, string> = {
+  pair: 'Frequent pairs',
+  group: 'Established groups',
+  team: 'User-created teams',
+};
+
 export function PeoplePage() {
   const { profiles, groups, currentUserId } = useApp();
   const [query, setQuery] = useState('');
@@ -30,6 +36,13 @@ export function PeoplePage() {
     return true;
   });
 
+  const groupSectionTitle = kind === '' ? 'Collaboration groups' : kind === 'individual' ? '' : GROUP_SECTION_TITLES[kind];
+  const resultSummary = kind === ''
+    ? `${filteredPeople.length} individual${filteredPeople.length === 1 ? '' : 's'} and ${filteredGroups.length} collaboration group${filteredGroups.length === 1 ? '' : 's'}`
+    : kind === 'individual'
+      ? `${filteredPeople.length} individual${filteredPeople.length === 1 ? '' : 's'}`
+      : `${filteredGroups.length} ${GROUP_SECTION_TITLES[kind].toLowerCase()}`;
+
   return (
     <div>
       <PageHeader title="People and Teams" subtitle="Individuals and proven collaborator groups in one search — no need to choose." />
@@ -45,7 +58,7 @@ export function PeoplePage() {
           value={kind}
           onChange={(e) => setKind(e.target.value as GroupKind | '')}
         >
-          <option value="">All group types</option>
+          <option value="">All people and teams</option>
           <option value="individual">Individuals</option>
           <option value="pair">Frequent pairs</option>
           <option value="group">Established groups</option>
@@ -55,6 +68,10 @@ export function PeoplePage() {
           <ShieldCheck className="w-4 h-4" /> Verified
         </button>
       </div>
+
+      <p role="status" aria-live="polite" className="mb-4 text-sm text-ink-500">
+        Showing {resultSummary}
+      </p>
 
       {/* Individuals */}
       {showIndividuals && <section className={showCollaborationGroups ? 'mb-8' : undefined}>
@@ -76,7 +93,7 @@ export function PeoplePage() {
       {showCollaborationGroups && <section>
         <div className="flex items-center gap-2 mb-3">
           <Users className="w-4 h-4 text-ink-400" />
-          <h2 className="font-semibold text-ink-900">Collaboration groups</h2>
+          <h2 className="font-semibold text-ink-900">{groupSectionTitle}</h2>
           <Badge tone="neutral">{filteredGroups.length}</Badge>
         </div>
         <p className="text-sm text-ink-500 mb-3">Factual history only — no superlatives. Each result explains why it was recommended.</p>

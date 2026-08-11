@@ -134,7 +134,7 @@ export function CompanyDetailPage({ companyId }: { companyId: string }) {
         )}
         <div className="flex flex-wrap gap-3 mt-4 text-sm">
           {company.website && !isDemo && <a href={company.website} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-brand-600 hover:underline"><Globe className="w-4 h-4" /> Website</a>}
-          <span className="flex items-center gap-1.5 text-ink-600"><Mail className="w-4 h-4" /> {company.contactInfo}</span>
+          {company.contactInfo && !isDemo && <span className="flex items-center gap-1.5 text-ink-600"><Mail className="w-4 h-4" /> {company.contactInfo}</span>}
         </div>
       </Card>
 

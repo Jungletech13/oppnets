@@ -9,23 +9,28 @@ test.describe('People and Teams regression bot', () => {
     await type.selectOption('individual');
     await expect(page.getByRole('heading', { name: 'Individuals' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Collaboration groups' })).toBeHidden();
+    await expect(page.getByRole('status')).toContainText('individuals');
 
     await type.selectOption('pair');
     await expect(page.getByRole('heading', { name: 'Individuals' })).toBeHidden();
-    await expect(page.getByRole('heading', { name: 'Collaboration groups' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Frequent pairs' })).toBeVisible();
     await expect(page.getByText('Frequent collaborator pair').first()).toBeVisible();
+    await expect(page.getByRole('status')).toContainText('frequent pairs');
 
     await type.selectOption('group');
+    await expect(page.getByRole('heading', { name: 'Established groups' })).toBeVisible();
     await expect(page.getByText('Established collaboration group').first()).toBeVisible();
     await expect(page.getByText('Frequent collaborator pair')).toHaveCount(0);
 
     await type.selectOption('team');
+    await expect(page.getByRole('heading', { name: 'User-created teams' })).toBeVisible();
     await expect(page.getByText('User-created team', { exact: true })).toBeVisible();
     await expect(page.getByText('Established collaboration group')).toHaveCount(0);
 
     await type.selectOption('');
     await expect(page.getByRole('heading', { name: 'Individuals' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Collaboration groups' })).toBeVisible();
+    await expect(page.getByRole('status')).toContainText('and');
   });
 
   test('filters by search and verified status without stale results', async ({ authenticatedPage: page }) => {

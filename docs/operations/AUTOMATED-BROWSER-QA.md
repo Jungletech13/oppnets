@@ -6,7 +6,7 @@ OppNets uses Playwright bots to simulate signed-out visitors, new users, returni
 
 ## Current coverage
 
-- Signed-out page load, OppNets title, canonical URL, description, and absence of Bolt branding
+- Signed-out page load, OppNets title, canonical URL, description, favicon, and owned social-preview image
 - Invalid-login feedback
 - Development-only new-user signup and returning-user login/logout simulations
 - Every primary desktop navigation destination

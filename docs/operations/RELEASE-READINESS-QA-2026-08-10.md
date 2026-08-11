@@ -15,7 +15,7 @@ The independent OppNets build is suitable for an isolated Cloudflare preview and
 - People and Teams type selection changes its type-specific choices and visible results
 - Mobile navigation, Messages list/thread behavior, touch targets, images/assets, and horizontal overflow are covered
 - OppNets title, description, canonical URL, Open Graph metadata, and favicon are present
-- Bolt configuration and runtime dependency are removed
+- Legacy builder configuration and runtime dependency are removed
 - Facebook integration remains proposal-only and is not part of this release branch
 
 ## Acceptance gates

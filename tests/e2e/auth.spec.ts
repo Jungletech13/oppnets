@@ -1,16 +1,18 @@
 import { test, expect } from './fixtures';
 
 test.describe('authentication bot', () => {
-  test('loads the signed-out experience with OppNets metadata and no Bolt branding', async ({ page }) => {
+  test('loads the signed-out experience with OppNets metadata and owned brand assets', async ({ page }) => {
     await page.goto('/');
 
     await expect(page).toHaveTitle('OppNets — The Opportunity Network');
     await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', 'https://oppnets.com/');
+    await expect(page.locator('link[rel="icon"]')).toHaveAttribute('href', '/favicon.svg');
     await expect(page.locator('meta[name="description"]')).toHaveAttribute('content', /OppNets is the Opportunity Network/);
+    await expect(page.locator('meta[property="og:image"]')).toHaveAttribute('content', 'https://oppnets.com/opengraph.png');
+    await expect(page.locator('meta[name="twitter:image"]')).toHaveAttribute('content', 'https://oppnets.com/opengraph.png');
     await expect(page.getByRole('heading', { name: 'Opportunity Network' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Sign In', exact: true }).first()).toBeVisible();
     await expect(page.getByRole('button', { name: 'Sign Up', exact: true })).toBeVisible();
-    await expect(page.locator('body')).not.toContainText(/bolt/i);
   });
 
   test('reports invalid returning-user credentials', async ({ page }) => {

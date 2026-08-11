@@ -535,9 +535,6 @@ export interface BuilderPartner {
   logoUrl: string;
   category: PartnerCategory;
   description: string;
-  website: string;
-  offer: string;
-  educational: boolean;
 }
 
 // Phase 2 — Success Stories

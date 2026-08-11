@@ -16,6 +16,8 @@ test.describe('mobile visitor bot', () => {
     await openMobileDestination(page, 'People and Teams');
     await expect(page.getByRole('heading', { name: 'People and Teams' })).toBeVisible();
     await page.getByLabel('People and team type').selectOption('pair');
+    await expect(page.getByRole('heading', { name: 'Frequent pairs' })).toBeVisible();
+    await expect(page.getByRole('status')).toContainText('frequent pairs');
     await expect(page.getByText('Frequent collaborator pair').first()).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Individuals' })).toBeHidden();
     await assertNoHorizontalOverflow(page);
