@@ -20,6 +20,7 @@ export function ProfessionalDetailPage({ professionalId }: { professionalId: str
   const [showInquiry, setShowInquiry] = useState(false);
   const [saved, setSaved] = useState(false);
   const [inquirySent, setInquirySent] = useState(false);
+  const [isDemo, setIsDemo] = useState(false);
 
   const loadProfessional = useCallback(async () => {
     setLoading(true);
@@ -53,14 +54,17 @@ export function ProfessionalDetailPage({ professionalId }: { professionalId: str
           ownerId: (r.owner_id as string) || '',
         };
         setPro(mapped);
+        setIsDemo(false);
       } else {
         setPro(demo ?? null);
+        setIsDemo(!!demo);
       }
       if (session) {
         setSaved(await isListingSaved('professional', professionalId));
       }
     } catch {
       setPro(demo ?? null);
+      setIsDemo(!!demo);
     } finally {
       setLoading(false);
     }
@@ -101,7 +105,7 @@ export function ProfessionalDetailPage({ professionalId }: { professionalId: str
     <div className="max-w-4xl mx-auto">
       <div className="flex items-center justify-between mb-4">
         <button onClick={() => navigate({ name: 'professionals' })} className="btn-ghost text-sm"><ArrowLeft className="w-4 h-4" /> Back to Professionals</button>
-        {session && (
+        {session && !isDemo && (
           <button onClick={handleSave} className="btn-ghost text-sm">
             {saved ? <><BookmarkCheck className="w-4 h-4 text-brand-600" /> Saved</> : <><Bookmark className="w-4 h-4" /> Save</>}
           </button>
@@ -111,6 +115,7 @@ export function ProfessionalDetailPage({ professionalId }: { professionalId: str
       {pro.sponsored && (
         <div className="flex items-center gap-1.5 mb-3 text-xs text-ink-500"><Sparkles className="w-3.5 h-3.5" /> Sponsored listing</div>
       )}
+      {isDemo && <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">Demonstration listing. This is not a verified real-world provider and cannot receive inquiries.</div>}
 
       <Card className="p-6 mb-5">
         <div className="flex items-start gap-4 mb-4">
@@ -135,7 +140,7 @@ export function ProfessionalDetailPage({ professionalId }: { professionalId: str
           <div className="flex items-center gap-2 text-ink-600"><Clock className="w-4 h-4 text-ink-400" /> {pro.responseTime}</div>
           <div className="flex items-center gap-2 text-ink-600"><DollarSign className="w-4 h-4 text-ink-400" /> {pro.pricingModel}</div>
           <div className="flex items-center gap-2 text-ink-600"><Briefcase className="w-4 h-4 text-ink-400" /> {pro.yearsInBusiness} year{pro.yearsInBusiness !== 1 ? 's' : ''} in business</div>
-          {pro.website && <a href={pro.website} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-brand-600 hover:underline"><Globe className="w-4 h-4" /> Website</a>}
+          {pro.website && !isDemo && <a href={pro.website} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-brand-600 hover:underline"><Globe className="w-4 h-4" /> Website</a>}
         </div>
       </Card>
 
@@ -209,7 +214,9 @@ export function ProfessionalDetailPage({ professionalId }: { professionalId: str
         <div className="flex flex-wrap gap-2 mb-4">
           {pro.contactMethods.map((m) => <span key={m} className="flex items-center gap-1.5 text-sm text-ink-700 bg-ink-50 rounded-lg px-3 py-1.5"><Mail className="w-4 h-4 text-ink-400" /> {m}</span>)}
         </div>
-        {session ? (
+        {isDemo ? (
+          <p className="text-sm text-ink-500">Inquiries are disabled for demonstration listings.</p>
+        ) : session ? (
           inquirySent ? (
             <div className="flex items-center gap-2 text-sm text-accent-700 bg-accent-50 rounded-lg p-3">
               <CheckCircle2 className="w-4 h-4 shrink-0" /> Your inquiry has been sent. The professional will respond through the platform.

@@ -1,7 +1,6 @@
 import { useApp } from '@/store';
-import { PageHeader } from '@/components/AppShell';
 import { Card, Avatar, TrustIndicators, VerificationPill, Badge, SectionHeader, EmptyState, Modal, Field } from '@/components/ui';
-import { MapPin, Clock, Briefcase, Heart, Target, Users, MessageSquare, ShieldAlert, Award, Rocket, Search, ShieldCheck } from 'lucide-react';
+import { MapPin, Clock, Briefcase, Users, MessageSquare, ShieldAlert, Award, Rocket, Search, ShieldCheck } from 'lucide-react';
 import { getProfile, getSpace } from '@/data';
 import { useState, useEffect } from 'react';
 import { fetchVerifiedCollaborationCount } from '@/lib/trust-queries';

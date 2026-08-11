@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useApp } from '@/store';
 import { PageHeader } from '@/components/AppShell';
 import { Card, Badge, Avatar, EmptyState } from '@/components/ui';
-import { MapPin, Star, ShieldCheck, Globe, Mail, ArrowLeft, Building2, Users, Briefcase, Target, Bookmark, BookmarkCheck } from 'lucide-react';
+import { MapPin, Star, ShieldCheck, Globe, Mail, ArrowLeft, Building2, Briefcase, Target, Bookmark, BookmarkCheck } from 'lucide-react';
 import { getCompany } from '@/data-phase2';
 import { fetchCompany, toggleSavedListing, isListingSaved } from '@/lib/queries';
 import { getProfile } from '@/data';
@@ -19,6 +19,7 @@ export function CompanyDetailPage({ companyId }: { companyId: string }) {
   const [company, setCompany] = useState<Company | null>(null);
   const [loading, setLoading] = useState(true);
   const [saved, setSaved] = useState(false);
+  const [isDemo, setIsDemo] = useState(false);
 
   const loadCompany = useCallback(async () => {
     setLoading(true);
@@ -47,14 +48,17 @@ export function CompanyDetailPage({ companyId }: { companyId: string }) {
           ownerId: (r.owner_id as string) || '',
         };
         setCompany(mapped);
+        setIsDemo(false);
       } else {
         setCompany(demo ?? null);
+        setIsDemo(!!demo);
       }
       if (session) {
         setSaved(await isListingSaved('company', companyId));
       }
     } catch {
       setCompany(demo ?? null);
+      setIsDemo(!!demo);
     } finally {
       setLoading(false);
     }
@@ -97,12 +101,14 @@ export function CompanyDetailPage({ companyId }: { companyId: string }) {
     <div className="max-w-4xl mx-auto">
       <div className="flex items-center justify-between mb-4">
         <button onClick={() => navigate({ name: 'companies' })} className="btn-ghost text-sm"><ArrowLeft className="w-4 h-4" /> Back to Companies</button>
-        {session && (
+        {session && !isDemo && (
           <button onClick={handleSave} className="btn-ghost text-sm">
             {saved ? <><BookmarkCheck className="w-4 h-4 text-brand-600" /> Saved</> : <><Bookmark className="w-4 h-4" /> Save</>}
           </button>
         )}
       </div>
+
+      {isDemo && <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">Demonstration company. Its verification, reviews, team, and outcomes are sample content rather than real-world claims.</div>}
 
       <Card className="p-6 mb-5">
         <div className="flex items-start gap-4 mb-4">
@@ -127,7 +133,7 @@ export function CompanyDetailPage({ companyId }: { companyId: string }) {
           </div>
         )}
         <div className="flex flex-wrap gap-3 mt-4 text-sm">
-          {company.website && <a href={company.website} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-brand-600 hover:underline"><Globe className="w-4 h-4" /> Website</a>}
+          {company.website && !isDemo && <a href={company.website} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-brand-600 hover:underline"><Globe className="w-4 h-4" /> Website</a>}
           <span className="flex items-center gap-1.5 text-ink-600"><Mail className="w-4 h-4" /> {company.contactInfo}</span>
         </div>
       </Card>

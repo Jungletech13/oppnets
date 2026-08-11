@@ -7,7 +7,6 @@ import type {
   AppNotification,
   CollaborationGroup,
   Task,
-  ChecklistItem,
   TaskStatus,
   Feedback,
   ID,
@@ -20,8 +19,12 @@ import type {
   TrustState,
 } from './types';
 import {
+  PROFILES,
   GROUPS,
+  OPPORTUNITIES,
   SPACES,
+  CONVERSATIONS,
+  NOTIFICATIONS,
   MY_TRUST,
 } from './data';
 import { useAuth } from '@/lib/auth';
@@ -164,6 +167,7 @@ export function useApp() {
 
 const uid = (p: string) => `${p}-${Math.random().toString(36).slice(2, 9)}`;
 const nowISO = () => new Date().toISOString();
+const e2eMode = import.meta.env.DEV && import.meta.env.VITE_E2E_MODE === 'true';
 const reportStatus = (status: string): import('./types').Report['status'] => {
   const labels: Record<string, import('./types').Report['status']> = {
     submitted: 'Submitted',
@@ -196,19 +200,20 @@ export { taskProgress };
 export function AppProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [route, setRoute] = useState<Route>(restoreRoute);
-  const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [profiles, setProfiles] = useState<Profile[]>(e2eMode ? PROFILES : []);
   const [groups] = useState<CollaborationGroup[]>(GROUPS);
-  const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
+  const [opportunities, setOpportunities] = useState<Opportunity[]>(e2eMode ? OPPORTUNITIES : []);
   const [spaces, setSpaces] = useState<CollaborationSpace[]>(SPACES);
-  const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [conversations, setConversations] = useState<Conversation[]>(e2eMode ? CONVERSATIONS : []);
+  const [notifications, setNotifications] = useState<AppNotification[]>(e2eMode ? NOTIFICATIONS : []);
   const [trust, setTrust] = useState<TrustState>(MY_TRUST);
-  const [dataLoading, setDataLoading] = useState(true);
+  const [dataLoading, setDataLoading] = useState(!e2eMode);
   const [dataError, setDataError] = useState<string | null>(null);
   const [loadVersion, setLoadVersion] = useState(0);
   const currentUserId = user?.id ?? '';
 
   useEffect(() => {
+    if (e2eMode) return;
     if (!user) return;
     let active = true;
     setDataLoading(true);
@@ -388,13 +393,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [updateSpace]);
 
   const sendMessage = useCallback(async (convId: ID, text: string) => {
+    if (e2eMode) {
+      setConversations((prev) => prev.map((conversation) =>
+        conversation.id === convId
+          ? { ...conversation, messages: [...conversation.messages, { id: uid('msg'), authorId: currentUserId, text: text.trim(), at: nowISO() }] }
+          : conversation
+      ));
+      return;
+    }
     const row = await persistMessage(convId, text.trim());
     if (!row) throw new Error('Message could not be saved.');
     const message = { id: row.id as string, authorId: row.author_id as string, text: row.text as string, at: row.at as string };
     setConversations((prev) => prev.map((conversation) =>
       conversation.id === convId ? { ...conversation, messages: [...conversation.messages, message] } : conversation
     ));
-  }, []);
+  }, [currentUserId]);
 
   const startConversation = useCallback(async (participantIds: ID[], title: string, type: Conversation['type'] = 'direct', spaceId?: ID, initialMessage = ''): Promise<ID> => {
     if (type !== 'direct' || participantIds.length !== 1) {
@@ -407,17 +420,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const markNotificationRead = useCallback(async (id: ID) => {
-    await persistNotificationRead(id);
+    if (!e2eMode) await persistNotificationRead(id);
     setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
   }, []);
 
   const markAllNotificationsRead = useCallback(async () => {
-    await persistAllNotificationsRead(currentUserId);
+    if (!e2eMode) await persistAllNotificationsRead(currentUserId);
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
   }, [currentUserId]);
 
   const updateProfile = useCallback(async (p: Profile) => {
-    await persistProfile(p.id, profileToUpdate(p));
+    if (!e2eMode) await persistProfile(p.id, profileToUpdate(p));
     setProfiles((prev) => prev.map((x) => (x.id === p.id ? p : x)));
   }, []);
 

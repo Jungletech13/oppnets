@@ -4,12 +4,17 @@ import { PageHeader } from '@/components/AppShell';
 import { PersonCard, GroupCard } from '@/components/PeopleCards';
 import { Badge, EmptyState } from '@/components/ui';
 import { Search, Users, ShieldCheck } from 'lucide-react';
+import type { GroupKind } from '@/types';
+import { groupMatchesKind, showGroupsForKind, showIndividualsForKind } from '@/lib/people-directory';
 
 export function PeoplePage() {
   const { profiles, groups, currentUserId } = useApp();
   const [query, setQuery] = useState('');
   const [verifiedOnly, setVerifiedOnly] = useState(false);
-  const [kind, setKind] = useState<string>('');
+  const [kind, setKind] = useState<GroupKind | ''>('');
+
+  const showIndividuals = showIndividualsForKind(kind);
+  const showCollaborationGroups = showGroupsForKind(kind);
 
   const people = useMemo(() => profiles.filter((p) => p.id !== currentUserId), [profiles, currentUserId]);
 
@@ -21,7 +26,7 @@ export function PeoplePage() {
 
   const filteredGroups = groups.filter((g) => {
     if (query && !(`${g.name} ${g.combinedSkills.join(' ')} ${g.industries.join(' ')}`.toLowerCase().includes(query.toLowerCase()))) return false;
-    if (kind && g.kind !== kind) return false;
+    if (!groupMatchesKind(g, kind)) return false;
     return true;
   });
 
@@ -34,20 +39,25 @@ export function PeoplePage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-400" />
           <input className="input pl-9" placeholder="Search by name, skill, or industry..." value={query} onChange={(e) => setQuery(e.target.value)} />
         </div>
-        <select className="input sm:w-48" value={kind} onChange={(e) => setKind(e.target.value)}>
+        <select
+          aria-label="People and team type"
+          className="input sm:w-48"
+          value={kind}
+          onChange={(e) => setKind(e.target.value as GroupKind | '')}
+        >
           <option value="">All group types</option>
           <option value="individual">Individuals</option>
           <option value="pair">Frequent pairs</option>
           <option value="group">Established groups</option>
           <option value="team">User-created teams</option>
         </select>
-        <button onClick={() => setVerifiedOnly((v) => !v)} className={`btn ${verifiedOnly ? 'bg-accent-50 text-accent-700 border border-accent-200' : 'bg-white text-ink-700 border border-ink-200'} px-4 py-2 text-sm`}>
+        <button aria-pressed={verifiedOnly} onClick={() => setVerifiedOnly((v) => !v)} className={`btn ${verifiedOnly ? 'bg-accent-50 text-accent-700 border border-accent-200' : 'bg-white text-ink-700 border border-ink-200'} px-4 py-2 text-sm`}>
           <ShieldCheck className="w-4 h-4" /> Verified
         </button>
       </div>
 
       {/* Individuals */}
-      <section className="mb-8">
+      {showIndividuals && <section className={showCollaborationGroups ? 'mb-8' : undefined}>
         <div className="flex items-center gap-2 mb-3">
           <Users className="w-4 h-4 text-ink-400" />
           <h2 className="font-semibold text-ink-900">Individuals</h2>
@@ -60,10 +70,10 @@ export function PeoplePage() {
             {filteredPeople.map((p) => <PersonCard key={p.id} profile={p} />)}
           </div>
         )}
-      </section>
+      </section>}
 
       {/* Groups */}
-      <section>
+      {showCollaborationGroups && <section>
         <div className="flex items-center gap-2 mb-3">
           <Users className="w-4 h-4 text-ink-400" />
           <h2 className="font-semibold text-ink-900">Collaboration groups</h2>
@@ -77,7 +87,7 @@ export function PeoplePage() {
             {filteredGroups.map((g) => <GroupCard key={g.id} group={g} />)}
           </div>
         )}
-      </section>
+      </section>}
     </div>
   );
 }

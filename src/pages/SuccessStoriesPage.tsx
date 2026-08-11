@@ -1,6 +1,6 @@
 import { PageHeader } from '@/components/AppShell';
-import { Card, Badge, Avatar } from '@/components/ui';
-import { Trophy, Users, Compass, Rocket, TrendingUp } from 'lucide-react';
+import { Card, Badge, Avatar, BetaNote } from '@/components/ui';
+import { Users, Compass, Rocket, TrendingUp } from 'lucide-react';
 import { SUCCESS_STORIES } from '@/data-phase2';
 import { getProfile } from '@/data';
 import { useApp } from '@/store';
@@ -10,7 +10,8 @@ export function SuccessStoriesPage() {
 
   return (
     <div>
-      <PageHeader title="Success Stories" subtitle="Real teams formed, real ventures launched, real growth — all through Opportunity Network." />
+      <PageHeader title="Example Success Stories" subtitle="Illustrative scenarios showing how OppNets collaborations could progress from discovery to measurable outcomes." />
+      <div className="mb-5"><BetaNote>These are hypothetical demonstration scenarios, not verified OppNets customer outcomes.</BetaNote></div>
 
       <div className="space-y-5">
         {SUCCESS_STORIES.map((story) => {

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { AlertTriangle, CheckCircle2, XCircle, ArrowUpCircle, FileText } from 'lucide-react';
 import { AdminPageHeader } from '@/components/AdminShell';
 import { Card, Badge, Modal, EmptyState } from '@/components/ui';
@@ -24,11 +24,7 @@ export function AdminModerationPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadAlerts();
-  }, [tab]);
-
-  async function loadAlerts() {
+  const loadAlerts = useCallback(async () => {
     setLoading(true);
     try {
       const data = await fetchFraudAlerts(tab);
@@ -38,7 +34,11 @@ export function AdminModerationPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [tab]);
+
+  useEffect(() => {
+    loadAlerts();
+  }, [loadAlerts]);
 
   async function handleAction(action: 'resolve' | 'dismiss' | 'escalate') {
     if (!selected || !reason.trim()) return;

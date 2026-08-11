@@ -4,7 +4,7 @@ import { PageHeader } from '@/components/AppShell';
 import { Card, Badge, Field, Modal, BetaNote } from '@/components/ui';
 import { OpportunityCard } from '@/components/OpportunityCard';
 import { Check, Eye, ArrowRight, ArrowLeft, Plus, X, Sparkles, Save, RotateCcw } from 'lucide-react';
-import type { Opportunity, OpportunityRole, Industry, OpportunityStage, Compensation, OpportunityDNA } from '@/types';
+import type { Opportunity, OpportunityRole, Industry, OpportunityStage, Compensation } from '@/types';
 
 const CATEGORIES: Industry[] = ['Real Estate', 'Cleaning & Services', 'Nonprofit', 'Technology', 'Film & Media', 'E-commerce', 'Food & Restaurant', 'Finance', 'Consulting', 'Community', 'Creative'];
 const STAGES: OpportunityStage[] = ['Idea', 'Recruiting', 'Planning', 'Building', 'Operating', 'Growing', 'Paused', 'Completed', 'Archived'];
@@ -161,13 +161,13 @@ export function CreateOpportunityPage() {
         {step === 0 && (
           <div className="space-y-4">
             <Field label="Opportunity name" hint="Be specific — a clear title helps the right people find you.">
-              <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-2">
                 <input className="input flex-1" value={form.title} onChange={(e) => set('title', e.target.value)} placeholder="e.g. House-flipping partnership in East Austin" />
                 <button onClick={() => set('title', generateAISuggestion('title', form) || form.title)} className="btn-secondary text-xs whitespace-nowrap"><Sparkles className="w-3.5 h-3.5" /> Suggest</button>
               </div>
             </Field>
             <Field label="Description" hint="Describe what exists, what you need, and what success looks like. This is your pitch to potential collaborators.">
-              <div className="flex gap-2 items-start">
+              <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-start">
                 <textarea className="input min-h-[100px] flex-1" value={form.description} onChange={(e) => set('description', e.target.value)} placeholder="Describe the opportunity, what exists, and what you need." />
                 <button onClick={() => set('description', generateAISuggestion('description', form) || form.description)} className="btn-secondary text-xs whitespace-nowrap mt-1"><Sparkles className="w-3.5 h-3.5" /> Suggest</button>
               </div>
@@ -191,7 +191,7 @@ export function CreateOpportunityPage() {
               <Field label="Desired start date"><input type="date" className="input" value={form.startDate} onChange={(e) => set('startDate', e.target.value)} /></Field>
             </div>
             <Field label="What you bring" hint="Assets, capital, skills, access, or progress you already have. Be specific — this builds trust.">
-              <div className="flex gap-2 items-start">
+              <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-start">
                 <textarea className="input flex-1" value={form.creatorBrings} onChange={(e) => set('creatorBrings', e.target.value)} placeholder="Assets, capital, skills, access, or progress you already have." />
                 <button onClick={() => set('creatorBrings', generateAISuggestion('creatorBrings', form) || form.creatorBrings)} className="btn-secondary text-xs whitespace-nowrap mt-1"><Sparkles className="w-3.5 h-3.5" /> Suggest</button>
               </div>
@@ -275,14 +275,14 @@ export function CreateOpportunityPage() {
       {publishError && <p className="text-sm text-red-600 mt-3" role="alert">{publishError}</p>}
 
       {/* Nav buttons */}
-      <div className="flex items-center justify-between mt-5">
+      <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-3 mt-5">
         <button onClick={() => step > 0 ? setStep(step - 1) : navigate({ name: 'discover' })} className="btn-secondary"><ArrowLeft className="w-4 h-4" /> {step === 0 ? 'Cancel' : 'Back'}</button>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
           <span className="text-xs text-ink-400 flex items-center gap-1"><Save className="w-3 h-3" /> Draft saved</span>
           {step < 4 ? (
             <button onClick={() => setStep(step + 1)} className="btn-primary" disabled={!valid}>Continue <ArrowRight className="w-4 h-4" /></button>
           ) : (
-            <div className="flex gap-2">
+            <div className="flex flex-wrap justify-end gap-2">
               <button onClick={() => setShowPreview(true)} className="btn-secondary"><Eye className="w-4 h-4" /> Full preview</button>
               <button onClick={publish} className="btn-primary" disabled={publishing}>{publishing ? 'Publishing...' : 'Publish'} <Check className="w-4 h-4" /></button>
             </div>

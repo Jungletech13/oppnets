@@ -1,14 +1,14 @@
-import { useApp, taskProgress } from '@/store';
+import { useApp } from '@/store';
 import { PageHeader } from '@/components/AppShell';
-import { Card, SectionHeader, Badge, Avatar, ProgressBar, StatusPill, EmptyState } from '@/components/ui';
+import { Card, SectionHeader, Badge, Avatar, ProgressBar, StatusPill } from '@/components/ui';
 import { OpportunityCard } from '@/components/OpportunityCard';
 import { PersonCard, GroupCard } from '@/components/PeopleCards';
 import {
-  Bell, CheckCircle2, AlertTriangle, CalendarClock, ListChecks, Users, LayoutDashboard,
+  Bell, CheckCircle2, AlertTriangle, CalendarClock, LayoutDashboard,
   ArrowRight, Handshake, Clock, Zap, Calendar, Flag,
 } from 'lucide-react';
 import { getProfile } from '@/data';
-import type { Task, CollaborationSpace } from '@/types';
+import type { Task } from '@/types';
 
 export function HomePage() {
   const { opportunities, groups, profiles, spaces, currentUserId, navigate, notifications } = useApp();
@@ -87,8 +87,9 @@ export function HomePage() {
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-ink-800 group-hover:text-red-700 truncate">{task.title}</p>
                           <p className="text-xs text-ink-500">{space.name} · Was due {task.dueDate}</p>
+                          <div className="mt-1 sm:hidden"><StatusPill status={task.status} /></div>
                         </div>
-                        <StatusPill status={task.status} />
+                        <div className="hidden sm:block shrink-0"><StatusPill status={task.status} /></div>
                       </button>
                     ))}
                   </div>

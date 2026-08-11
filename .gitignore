@@ -32,3 +32,5 @@ supabase/migrations_remote_fetch_raw_*/
 
 # Persona runs are generated evidence; selected clean runs may be force-added.
 qa/persona-lab/results/
+playwright-report/
+test-results/
