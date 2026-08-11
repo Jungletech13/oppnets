@@ -101,30 +101,57 @@ export async function fetchUserSpacesWithDetails(userId: string) {
 export async function fetchSpace(spaceId: string) {
   const { data, error } = await supabase
     .from('collaboration_spaces')
-    .select('*, space_members(*), tasks(*, checklist_items(*)), milestones(*), space_files(*), decisions(*), activity_log(*)')
+    .select('*, space_members(*), tasks(*, checklist_items(*)), milestones(*), space_files(*), decisions(*), activity_log(*), collaboration_record_acknowledgments(*)')
     .eq('id', spaceId)
     .maybeSingle();
   if (error) throw error;
   return data;
 }
 
-export async function createCollaborationSpace(input: {
-  opportunityId: string;
-  name: string;
-  description: string;
-  mission: string;
-  memberIds: string[];
-}) {
-  const { data: spaceId, error } = await supabase.rpc('create_collaboration_space', {
-    p_opportunity_id: input.opportunityId,
-    p_name: input.name,
-    p_description: input.description,
-    p_mission: input.mission,
+export async function updateCollaborationSpace(spaceId: string, updates: Record<string, unknown>) {
+  const { error } = await supabase.from('collaboration_spaces').update(updates).eq('id', spaceId);
+  if (error) throw error;
+  return fetchSpace(spaceId);
+}
+
+export async function createMilestone(spaceId: string, milestone: TaskMilestoneInput) {
+  const { error } = await supabase.from('milestones').insert({
+    space_id: spaceId,
+    title: milestone.title,
+    due_date: milestone.dueDate || null,
+    done: milestone.done,
   });
   if (error) throw error;
-  if (!spaceId) throw new Error('Collaboration space was created without a returned identifier.');
+  return fetchSpace(spaceId);
+}
 
-  return fetchSpace(spaceId as string);
+interface TaskMilestoneInput {
+  title: string;
+  dueDate: string;
+  done: boolean;
+}
+
+export async function updateMilestone(spaceId: string, milestoneId: string, done: boolean) {
+  const { error } = await supabase.from('milestones').update({ done }).eq('id', milestoneId).eq('space_id', spaceId);
+  if (error) throw error;
+  return fetchSpace(spaceId);
+}
+
+export async function createDecision(spaceId: string, decision: { title: string; rationale: string; decidedAt: string }) {
+  const { error } = await supabase.from('decisions').insert({
+    space_id: spaceId,
+    title: decision.title,
+    rationale: decision.rationale,
+    decided_at: decision.decidedAt,
+  });
+  if (error) throw error;
+  return fetchSpace(spaceId);
+}
+
+export async function acknowledgeCollaborationRecord(spaceId: string) {
+  const { error } = await supabase.from('collaboration_record_acknowledgments').upsert({ space_id: spaceId });
+  if (error) throw error;
+  return fetchSpace(spaceId);
 }
 
 export async function createTask(spaceId: string, task: Task) {
@@ -211,6 +238,25 @@ export async function fetchConversations(userId: string) {
 export async function createDirectConversation(recipientId: string, title: string, initialMessage: string) {
   const { data: conversationId, error } = await supabase.rpc('create_direct_conversation', {
     p_recipient_id: recipientId,
+    p_title: title,
+    p_initial_message: initialMessage,
+  });
+  if (error) throw error;
+  if (!conversationId) throw new Error('Conversation was created without an identifier.');
+
+  const { data, error: fetchError } = await supabase
+    .from('conversations')
+    .select('*, conversation_participants(user_id), messages(*)')
+    .eq('id', conversationId)
+    .maybeSingle();
+  if (fetchError) throw fetchError;
+  if (!data) throw new Error('Created conversation could not be reloaded.');
+  return data;
+}
+
+export async function createSpaceConversation(spaceId: string, title: string, initialMessage: string) {
+  const { data: conversationId, error } = await supabase.rpc('create_space_conversation', {
+    p_space_id: spaceId,
     p_title: title,
     p_initial_message: initialMessage,
   });

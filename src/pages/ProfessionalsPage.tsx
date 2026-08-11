@@ -6,7 +6,9 @@ import { Search, MapPin, Star, ShieldCheck, Sparkles, Store, Plus, Bookmark, Boo
 import { PROFESSIONALS as DEMO_PROFESSIONALS } from '@/data-phase2';
 import { fetchProfessionals, createProfessional, fetchSavedListings, toggleSavedListing } from '@/lib/queries';
 import { useAuth } from '@/lib/auth';
-import type { Industry, Professional, ProfessionalCategory } from '@/types';
+import { mapProfessionalRow } from '@/lib/domain-mappers';
+import { isE2EMode } from '@/lib/runtime';
+import type { Professional, ProfessionalCategory } from '@/types';
 
 const CATEGORIES: (ProfessionalCategory | 'All')[] = [
   'All', 'Attorney', 'CPA', 'Bookkeeper', 'Marketing Agency', 'Designer', 'Developer',
@@ -15,10 +17,6 @@ const CATEGORIES: (ProfessionalCategory | 'All')[] = [
   'Commercial Real Estate Agent', 'Manufacturer', 'Logistics Provider', 'Other',
 ];
 
-interface DbProfessional extends Professional {
-  professional_reviews?: Professional['reviews'];
-}
-
 export function ProfessionalsPage() {
   const { navigate } = useApp();
   const { session } = useAuth();
@@ -26,7 +24,7 @@ export function ProfessionalsPage() {
   const [category, setCategory] = useState<ProfessionalCategory | 'All'>('All');
   const [remoteOnly, setRemoteOnly] = useState(false);
   const [verifiedOnly, setVerifiedOnly] = useState(false);
-  const [dbPros, setDbPros] = useState<DbProfessional[]>([]);
+  const [dbPros, setDbPros] = useState<Professional[]>(isE2EMode ? DEMO_PROFESSIONALS : []);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
@@ -35,39 +33,21 @@ export function ProfessionalsPage() {
   const loadProfessionals = useCallback(async () => {
     setLoading(true);
     setError(null);
+    if (isE2EMode) {
+      setDbPros(DEMO_PROFESSIONALS);
+      setLoading(false);
+      return;
+    }
     try {
       const data = await fetchProfessionals();
-      const mapped: DbProfessional[] = (data || []).map((r: Record<string, unknown>) => ({
-        id: r.id as string,
-        businessName: r.business_name as string,
-        logoUrl: (r.logo_url as string) || '',
-        category: r.category as ProfessionalCategory,
-        description: (r.description as string) || '',
-        services: (r.services as string[]) || [],
-        industriesServed: (r.industries_served as Industry[]) || [],
-        location: (r.location as string) || '',
-        remote: (r.remote as boolean) ?? true,
-        portfolio: (r.portfolio as Professional['portfolio']) || [],
-        certifications: (r.certifications as string[]) || [],
-        website: (r.website as string) || '',
-        yearsInBusiness: (r.years_in_business as number) || 1,
-        contactMethods: (r.contact_methods as string[]) || [],
-        responseTime: (r.response_time as string) || 'Within 24 hours',
-        pricingModel: (r.pricing_model as Professional['pricingModel']) || 'Contact for quote',
-        availability: (r.availability as Professional['availability']) || 'Available',
-        reviews: (r.professional_reviews as Professional['reviews']) || [],
-        verified: (r.verified as boolean) ?? false,
-        premium: (r.premium as boolean) ?? false,
-        sponsored: (r.sponsored as boolean) ?? false,
-        ownerId: (r.owner_id as string) || '',
-      }));
+      const mapped = (data || []).map((row) => mapProfessionalRow(row as Record<string, unknown>));
       setDbPros(mapped);
       if (session) {
         const saved = await fetchSavedListings();
         setSavedIds(new Set((saved ?? []).filter((row) => row.listing_type === 'professional').map((row) => row.listing_id)));
       }
     } catch {
-      setError('Could not load professionals. Showing demo data instead.');
+      setError('Could not load professionals. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -77,7 +57,7 @@ export function ProfessionalsPage() {
     loadProfessionals();
   }, [loadProfessionals]);
 
-  const allPros = [...dbPros, ...DEMO_PROFESSIONALS.filter((dp) => !dbPros.some((db) => db.id === dp.id))];
+  const allPros = dbPros;
 
   const filtered = allPros.filter((p) => {
     if (category !== 'All' && p.category !== category) return false;

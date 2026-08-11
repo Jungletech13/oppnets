@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
+import { isE2EMode } from '@/lib/runtime';
 
 interface AuthContextValue {
   session: Session | null;
@@ -15,8 +16,6 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 const E2E_AUTH_STORAGE_KEY = 'oppnets:e2e-authenticated';
-const e2eMode = import.meta.env.DEV && import.meta.env.VITE_E2E_MODE === 'true';
-
 function createE2ESession(): Session {
   const now = Math.floor(Date.now() / 1000);
   return {
@@ -37,59 +36,32 @@ function createE2ESession(): Session {
 }
 
 function hasE2ESession(): boolean {
-  return e2eMode && window.localStorage.getItem(E2E_AUTH_STORAGE_KEY) === 'true';
-}
-
-const refreshCookieName = 'oppnets_refresh_token';
-
-function saveRefreshToken(token: string) {
-  document.cookie = `${refreshCookieName}=${encodeURIComponent(token)}; Path=/; Secure; SameSite=Lax`;
-}
-
-function readRefreshToken() {
-  const prefix = `${refreshCookieName}=`;
-  const cookie = document.cookie.split('; ').find((item) => item.startsWith(prefix));
-  return cookie ? decodeURIComponent(cookie.slice(prefix.length)) : null;
-}
-
-function clearRefreshToken() {
-  document.cookie = `${refreshCookieName}=; Path=/; Secure; SameSite=Lax; Max-Age=0`;
+  return isE2EMode && window.localStorage.getItem(E2E_AUTH_STORAGE_KEY) === 'true';
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(() => hasE2ESession() ? createE2ESession() : null);
-  const [loading, setLoading] = useState(!e2eMode);
+  const [loading, setLoading] = useState(!isE2EMode);
 
   useEffect(() => {
-    if (e2eMode) return;
+    if (isE2EMode) return;
+
+    // One-release cleanup for refresh tokens written by the retired Bolt-era
+    // auth wrapper. Supabase now owns the single persisted session.
+    document.cookie = 'oppnets_refresh_token=; Path=/; Secure; SameSite=Lax; Max-Age=0';
 
     let active = true;
     let initialized = false;
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!active) return;
-      if (session) {
-        saveRefreshToken(session.refresh_token);
-        setSession(session);
-      } else if (initialized) {
-        setSession(null);
-      }
+      if (session || initialized) setSession(session);
     });
 
     const restoreSession = async () => {
       try {
         const { data } = await supabase.auth.getSession();
-        let restoredSession = data.session;
-        const refreshToken = readRefreshToken();
-
-        if (!restoredSession) {
-          if (refreshToken) {
-            const { data: refreshed } = await supabase.auth.refreshSession({ refresh_token: refreshToken });
-            restoredSession = refreshed.session;
-          }
-        }
-
-        if (active) setSession(restoredSession);
+        if (active) setSession(data.session);
       } finally {
         initialized = true;
         if (active) setLoading(false);
@@ -107,7 +79,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isAdmin = (session?.user?.app_metadata?.role as string | undefined) === 'admin';
 
   const signUp = async (email: string, password: string) => {
-    if (e2eMode) {
+    if (isE2EMode) {
       if (!email.endsWith('@oppnets.test') || password.length < 6) {
         return { error: 'Use an @oppnets.test address and a password of at least 6 characters in E2E mode.' };
       }
@@ -115,13 +87,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(createE2ESession());
       return { error: null };
     }
-    const { data, error } = await supabase.auth.signUp({ email, password });
-    if (data.session) saveRefreshToken(data.session.refresh_token);
+    const { error } = await supabase.auth.signUp({ email, password });
     return { error: error?.message ?? null };
   };
 
   const signIn = async (email: string, password: string) => {
-    if (e2eMode) {
+    if (isE2EMode) {
       if (email !== 'returning.user@oppnets.test' || password !== 'OppNetsTest1!') {
         return { error: 'Invalid E2E test credentials.' };
       }
@@ -129,18 +100,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(createE2ESession());
       return { error: null };
     }
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (data.session) saveRefreshToken(data.session.refresh_token);
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
     return { error: error?.message ?? null };
   };
 
   const signOut = async () => {
-    if (e2eMode) {
+    if (isE2EMode) {
       window.localStorage.removeItem(E2E_AUTH_STORAGE_KEY);
       setSession(null);
       return;
     }
-    clearRefreshToken();
     await supabase.auth.signOut();
   };
 
@@ -151,6 +120,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 }
 
+// The provider and hook intentionally share this module so they use one context.
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error('useAuth must be used within AuthProvider');

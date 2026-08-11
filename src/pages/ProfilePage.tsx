@@ -1,7 +1,6 @@
 import { useApp } from '@/store';
 import { Card, Avatar, TrustIndicators, VerificationPill, Badge, SectionHeader, EmptyState, Modal, Field } from '@/components/ui';
 import { MapPin, Clock, Briefcase, Users, MessageSquare, ShieldAlert, Award, Rocket, Search, ShieldCheck } from 'lucide-react';
-import { getProfile, getSpace } from '@/data';
 import { useState, useEffect } from 'react';
 import { fetchVerifiedCollaborationCount } from '@/lib/trust-queries';
 import type { Profile, VentureOutcome } from '@/types';
@@ -36,7 +35,7 @@ export function ProfilePage({ profileId }: { profileId?: string }) {
 
   if (!profile) return <EmptyState icon={<Users className="w-5 h-5" />} title="Profile not found" description="This profile does not exist." />;
 
-  const buildingSpaces = profile.buildingIds.map((id) => getSpace(id)).filter(Boolean);
+  const buildingSpaces = profile.buildingIds.map((spaceId) => spaces.find((space) => space.id === spaceId)).filter(Boolean);
   const myOpportunities = opportunities.filter((o) => o.ownerId === id);
   const myCollaborationSpaces = spaces.filter((s) => s.memberIds.includes(id));
 
@@ -179,7 +178,7 @@ export function ProfilePage({ profileId }: { profileId?: string }) {
             <SectionHeader title="Collaboration history" />
             <div className="space-y-2">
               {profile.collaborationHistory.length === 0 ? <p className="text-sm text-ink-500">No prior collaborations listed.</p> : profile.collaborationHistory.map((c, i) => {
-                const partner = getProfile(c.partnerId);
+                const partner = profiles.find((candidate) => candidate.id === c.partnerId);
                 return partner ? (
                   <button key={i} onClick={() => navigate({ name: 'profile', profileId: partner.id })} className="w-full text-left flex items-center gap-3 p-2 rounded-lg hover:bg-ink-50">
                     <Avatar src={partner.photoUrl} name={partner.name} size={32} />
@@ -200,7 +199,7 @@ export function ProfilePage({ profileId }: { profileId?: string }) {
             {profile.endorsements.length === 0 ? <p className="text-sm text-ink-500">No endorsements yet.</p> : (
               <div className="space-y-3">
                 {profile.endorsements.map((e, i) => {
-                  const from = getProfile(e.fromId);
+                  const from = profiles.find((candidate) => candidate.id === e.fromId);
                   return (
                     <div key={i} className="border-l-2 border-brand-200 pl-3">
                       <p className="text-sm text-ink-700 italic">"{e.text}"</p>

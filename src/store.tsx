@@ -10,11 +10,9 @@ import type {
   TaskStatus,
   Feedback,
   ID,
-  ModuleKind,
   WorkspaceModule,
   Milestone,
   Decision,
-  CheckIn,
   CheckInFrequency,
   TrustState,
 } from './types';
@@ -30,13 +28,18 @@ import {
 import { useAuth } from '@/lib/auth';
 import {
   createOpportunity as persistOpportunity,
-  createCollaborationSpace,
   createTask,
   fetchOpportunities,
   fetchProfiles,
   fetchUserSpacesWithDetails,
   fetchConversations,
   createDirectConversation,
+  createSpaceConversation,
+  updateCollaborationSpace,
+  createMilestone as persistMilestone,
+  updateMilestone as persistMilestoneUpdate,
+  createDecision as persistDecision,
+  acknowledgeCollaborationRecord,
   fetchNotifications,
   sendMessage as persistMessage,
   markNotificationRead as persistNotificationRead,
@@ -49,6 +52,8 @@ import {
   updateProfile as persistProfile,
 } from '@/lib/queries';
 import { mapConversationRow, mapNotificationRow, mapOpportunityRow, mapProfileRow, mapSpaceRow, profileToUpdate } from '@/lib/domain-mappers';
+import { isE2EMode } from '@/lib/runtime';
+import { createEmptyTrustState } from '@/lib/trust-state';
 
 export type Route =
   | { name: 'landing' }
@@ -132,21 +137,19 @@ interface AppState {
   retryDataLoad: () => void;
   // actions
   createOpportunity: (o: Opportunity) => Promise<Opportunity>;
-  createSpaceFromOpportunity: (oppId: ID, name: string, description: string, memberIds: ID[]) => Promise<ID>;
-  updateSpace: (spaceId: ID, updater: (s: CollaborationSpace) => CollaborationSpace) => void;
+  updateSpace: (spaceId: ID, updater: (s: CollaborationSpace) => CollaborationSpace) => Promise<void>;
   addTask: (spaceId: ID, task: Task) => Promise<void>;
   updateTask: (spaceId: ID, taskId: ID, updater: (t: Task) => Task) => Promise<void>;
   submitForReview: (spaceId: ID, taskId: ID) => Promise<void>;
   reviewTask: (spaceId: ID, taskId: ID, action: 'approve' | 'changes' | 'discussion', feedback?: Omit<Feedback, 'id' | 'at'>) => Promise<void>;
   toggleChecklistItem: (spaceId: ID, taskId: ID, itemId: ID) => Promise<void>;
   toggleChecklistReview: (spaceId: ID, taskId: ID, itemId: ID) => Promise<void>;
-  updateModules: (spaceId: ID, modules: WorkspaceModule[]) => void;
-  addMilestone: (spaceId: ID, m: Milestone) => void;
-  toggleMilestone: (spaceId: ID, milestoneId: ID) => void;
-  addDecision: (spaceId: ID, d: Decision) => void;
-  addCheckIn: (spaceId: ID, ci: CheckIn) => void;
-  setCheckInFrequency: (spaceId: ID, f: CheckInFrequency) => void;
-  acknowledgeRecord: (spaceId: ID, profileId: ID) => void;
+  updateModules: (spaceId: ID, modules: WorkspaceModule[]) => Promise<void>;
+  addMilestone: (spaceId: ID, m: Milestone) => Promise<void>;
+  toggleMilestone: (spaceId: ID, milestoneId: ID) => Promise<void>;
+  addDecision: (spaceId: ID, d: Decision) => Promise<void>;
+  setCheckInFrequency: (spaceId: ID, f: CheckInFrequency) => Promise<void>;
+  acknowledgeRecord: (spaceId: ID) => Promise<void>;
   sendMessage: (convId: ID, text: string) => Promise<void>;
   startConversation: (participantIds: ID[], title: string, type?: Conversation['type'], spaceId?: ID, initialMessage?: string) => Promise<ID>;
   markNotificationRead: (id: ID) => Promise<void>;
@@ -159,6 +162,8 @@ interface AppState {
 
 const Ctx = createContext<AppState | null>(null);
 
+// The provider and hook intentionally share this module so they use one context.
+// eslint-disable-next-line react-refresh/only-export-components
 export function useApp() {
   const ctx = useContext(Ctx);
   if (!ctx) throw new Error('useApp must be used within AppProvider');
@@ -167,7 +172,6 @@ export function useApp() {
 
 const uid = (p: string) => `${p}-${Math.random().toString(36).slice(2, 9)}`;
 const nowISO = () => new Date().toISOString();
-const e2eMode = import.meta.env.DEV && import.meta.env.VITE_E2E_MODE === 'true';
 const reportStatus = (status: string): import('./types').Report['status'] => {
   const labels: Record<string, import('./types').Report['status']> = {
     submitted: 'Submitted',
@@ -186,34 +190,23 @@ const errorMessage = (error: unknown, fallback: string) => {
   return fallback;
 };
 
-function taskProgress(t: Task): { done: number; total: number; pct: number; approvedPct: number } {
-  const total = t.checklist.length;
-  const done = t.checklist.filter((c) => c.done).length;
-  const approvedDone = t.checklist.filter((c) => c.done && !c.submittedForReview).length;
-  const pct = total ? Math.round((done / total) * 100) : 0;
-  const approvedPct = total ? Math.round((approvedDone / total) * 100) : 0;
-  return { done, total, pct, approvedPct };
-}
-
-export { taskProgress };
-
 export function AppProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [route, setRoute] = useState<Route>(restoreRoute);
-  const [profiles, setProfiles] = useState<Profile[]>(e2eMode ? PROFILES : []);
-  const [groups] = useState<CollaborationGroup[]>(GROUPS);
-  const [opportunities, setOpportunities] = useState<Opportunity[]>(e2eMode ? OPPORTUNITIES : []);
-  const [spaces, setSpaces] = useState<CollaborationSpace[]>(SPACES);
-  const [conversations, setConversations] = useState<Conversation[]>(e2eMode ? CONVERSATIONS : []);
-  const [notifications, setNotifications] = useState<AppNotification[]>(e2eMode ? NOTIFICATIONS : []);
-  const [trust, setTrust] = useState<TrustState>(MY_TRUST);
-  const [dataLoading, setDataLoading] = useState(!e2eMode);
+  const [profiles, setProfiles] = useState<Profile[]>(isE2EMode ? PROFILES : []);
+  const [groups] = useState<CollaborationGroup[]>(isE2EMode ? GROUPS : []);
+  const [opportunities, setOpportunities] = useState<Opportunity[]>(isE2EMode ? OPPORTUNITIES : []);
+  const [spaces, setSpaces] = useState<CollaborationSpace[]>(isE2EMode ? SPACES : []);
+  const [conversations, setConversations] = useState<Conversation[]>(isE2EMode ? CONVERSATIONS : []);
+  const [notifications, setNotifications] = useState<AppNotification[]>(isE2EMode ? NOTIFICATIONS : []);
+  const [trust, setTrust] = useState<TrustState>(() => isE2EMode ? MY_TRUST : createEmptyTrustState());
+  const [dataLoading, setDataLoading] = useState(!isE2EMode);
   const [dataError, setDataError] = useState<string | null>(null);
   const [loadVersion, setLoadVersion] = useState(0);
   const currentUserId = user?.id ?? '';
 
   useEffect(() => {
-    if (e2eMode) return;
+    if (isE2EMode) return;
     if (!user) return;
     let active = true;
     setDataLoading(true);
@@ -278,21 +271,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return persisted;
   }, []);
 
-  const createSpaceFromOpportunity = useCallback(
-    async (oppId: ID, name: string, description: string, memberIds: ID[]): Promise<ID> => {
-      const opp = opportunities.find((o) => o.id === oppId);
-      const row = await createCollaborationSpace({ opportunityId: oppId, name, description, mission: opp?.description ?? '', memberIds });
-      if (!row) throw new Error('Created collaboration space could not be loaded.');
-      const newSpace = mapSpaceRow(row as Record<string, unknown>);
-      setSpaces((prev) => [newSpace, ...prev]);
-      return newSpace.id;
-    },
-    [opportunities, currentUserId]
-  );
-
-  const updateSpace = useCallback((spaceId: ID, updater: (s: CollaborationSpace) => CollaborationSpace) => {
-    setSpaces((prev) => prev.map((s) => (s.id === spaceId ? updater(s) : s)));
+  const replacePersistedSpace = useCallback((spaceId: ID, row: Record<string, unknown> | null) => {
+    if (!row) throw new Error('Collaboration Space could not be reloaded.');
+    const persistedSpace = mapSpaceRow(row);
+    setSpaces((prev) => prev.map((space) => (space.id === spaceId ? persistedSpace : space)));
   }, []);
+
+  const updateSpace = useCallback(async (spaceId: ID, updater: (s: CollaborationSpace) => CollaborationSpace) => {
+    const current = spaces.find((space) => space.id === spaceId);
+    if (!current) throw new Error('Collaboration Space not found.');
+    const updated = updater(current);
+    if (isE2EMode) {
+      setSpaces((prev) => prev.map((space) => (space.id === spaceId ? updated : space)));
+      return;
+    }
+    const changes: Record<string, unknown> = {};
+    if (updated.notes !== current.notes) changes.notes = updated.notes;
+    if (updated.modules !== current.modules) changes.modules = updated.modules;
+    if (updated.checkInFrequency !== current.checkInFrequency) changes.check_in_frequency = updated.checkInFrequency;
+    const row = await updateCollaborationSpace(spaceId, changes);
+    replacePersistedSpace(spaceId, row as Record<string, unknown> | null);
+  }, [spaces, replacePersistedSpace]);
 
   const addTask = useCallback(async (spaceId: ID, task: Task) => {
     const row = await createTask(spaceId, task);
@@ -352,48 +351,69 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [updateTask]
   );
 
-  const updateModules = useCallback((spaceId: ID, modules: WorkspaceModule[]) => {
-    updateSpace(spaceId, (s) => ({ ...s, modules }));
+  const updateModules = useCallback(async (spaceId: ID, modules: WorkspaceModule[]) => {
+    await updateSpace(spaceId, (s) => ({ ...s, modules }));
   }, [updateSpace]);
 
-  const addMilestone = useCallback((spaceId: ID, m: Milestone) => {
-    updateSpace(spaceId, (s) => ({ ...s, milestones: [...s.milestones, m] }));
+  const addMilestone = useCallback(async (spaceId: ID, milestone: Milestone) => {
+    if (isE2EMode) {
+      setSpaces((prev) => prev.map((space) => space.id === spaceId ? { ...space, milestones: [...space.milestones, milestone] } : space));
+      return;
+    }
+    const row = await persistMilestone(spaceId, milestone);
+    replacePersistedSpace(spaceId, row as Record<string, unknown> | null);
+  }, [replacePersistedSpace]);
+
+  const toggleMilestone = useCallback(async (spaceId: ID, milestoneId: ID) => {
+    const milestone = spaces.find((space) => space.id === spaceId)?.milestones.find((item) => item.id === milestoneId);
+    if (!milestone) throw new Error('Milestone not found.');
+    if (isE2EMode) {
+      setSpaces((prev) => prev.map((space) => space.id === spaceId ? {
+        ...space,
+        milestones: space.milestones.map((item) => item.id === milestoneId ? { ...item, done: !item.done } : item),
+      } : space));
+      return;
+    }
+    const row = await persistMilestoneUpdate(spaceId, milestoneId, !milestone.done);
+    replacePersistedSpace(spaceId, row as Record<string, unknown> | null);
+  }, [spaces, replacePersistedSpace]);
+
+  const addDecision = useCallback(async (spaceId: ID, decision: Decision) => {
+    if (isE2EMode) {
+      setSpaces((prev) => prev.map((space) => space.id === spaceId ? {
+        ...space,
+        decisions: [decision, ...space.decisions],
+        record: { ...space.record, majorDecisions: [decision, ...space.record.majorDecisions] },
+      } : space));
+      return;
+    }
+    const row = await persistDecision(spaceId, decision);
+    replacePersistedSpace(spaceId, row as Record<string, unknown> | null);
+  }, [replacePersistedSpace]);
+
+  const setCheckInFrequency = useCallback(async (spaceId: ID, f: CheckInFrequency) => {
+    await updateSpace(spaceId, (s) => ({ ...s, checkInFrequency: f }));
   }, [updateSpace]);
 
-  const toggleMilestone = useCallback((spaceId: ID, milestoneId: ID) => {
-    updateSpace(spaceId, (s) => ({
-      ...s,
-      milestones: s.milestones.map((m) => (m.id === milestoneId ? { ...m, done: !m.done } : m)),
-      activity: s.activity,
-    }));
-  }, [updateSpace]);
-
-  const addDecision = useCallback((spaceId: ID, d: Decision) => {
-    updateSpace(spaceId, (s) => ({
-      ...s,
-      decisions: [d, ...s.decisions],
-      record: { ...s.record, majorDecisions: [d, ...s.record.majorDecisions] },
-      activity: [{ id: uid('a'), at: nowISO(), text: `Decision logged: ${d.title}`, actorId: d.by }, ...s.activity],
-    }));
-  }, [updateSpace]);
-
-  const addCheckIn = useCallback((spaceId: ID, ci: CheckIn) => {
-    updateSpace(spaceId, (s) => ({ ...s, checkIns: [ci, ...s.checkIns] }));
-  }, [updateSpace]);
-
-  const setCheckInFrequency = useCallback((spaceId: ID, f: CheckInFrequency) => {
-    updateSpace(spaceId, (s) => ({ ...s, checkInFrequency: f }));
-  }, [updateSpace]);
-
-  const acknowledgeRecord = useCallback((spaceId: ID, profileId: ID) => {
-    updateSpace(spaceId, (s) => ({
-      ...s,
-      record: { ...s.record, acknowledgments: s.record.acknowledgments.includes(profileId) ? s.record.acknowledgments : [...s.record.acknowledgments, profileId] },
-    }));
-  }, [updateSpace]);
+  const acknowledgeRecord = useCallback(async (spaceId: ID) => {
+    if (isE2EMode) {
+      setSpaces((prev) => prev.map((space) => space.id === spaceId ? {
+        ...space,
+        record: {
+          ...space.record,
+          acknowledgments: space.record.acknowledgments.includes(currentUserId)
+            ? space.record.acknowledgments
+            : [...space.record.acknowledgments, currentUserId],
+        },
+      } : space));
+      return;
+    }
+    const row = await acknowledgeCollaborationRecord(spaceId);
+    replacePersistedSpace(spaceId, row as Record<string, unknown> | null);
+  }, [currentUserId, replacePersistedSpace]);
 
   const sendMessage = useCallback(async (convId: ID, text: string) => {
-    if (e2eMode) {
+    if (isE2EMode) {
       setConversations((prev) => prev.map((conversation) =>
         conversation.id === convId
           ? { ...conversation, messages: [...conversation.messages, { id: uid('msg'), authorId: currentUserId, text: text.trim(), at: nowISO() }] }
@@ -410,27 +430,41 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [currentUserId]);
 
   const startConversation = useCallback(async (participantIds: ID[], title: string, type: Conversation['type'] = 'direct', spaceId?: ID, initialMessage = ''): Promise<ID> => {
-    if (type !== 'direct' || participantIds.length !== 1) {
-      throw new Error('Only direct conversations can be started here.');
+    if (!initialMessage.trim()) throw new Error('Message cannot be empty.');
+    if (isE2EMode) {
+      const id = uid('conv');
+      const conversation: Conversation = {
+        id, type, title, participantIds, spaceId,
+        messages: [{ id: uid('msg'), authorId: currentUserId, text: initialMessage.trim(), at: nowISO() }],
+      };
+      setConversations((prev) => [conversation, ...prev]);
+      return id;
     }
-    const row = await createDirectConversation(participantIds[0], title, initialMessage);
+    let row;
+    if (type === 'space' && spaceId) {
+      row = await createSpaceConversation(spaceId, title, initialMessage);
+    } else if (type === 'direct' && participantIds.length === 1) {
+      row = await createDirectConversation(participantIds[0], title, initialMessage);
+    } else {
+      throw new Error('Unsupported conversation type.');
+    }
     const conversation = mapConversationRow(row as Record<string, unknown>);
     setConversations((prev) => [conversation, ...prev.filter((item) => item.id !== conversation.id)]);
     return conversation.id;
-  }, []);
+  }, [currentUserId]);
 
   const markNotificationRead = useCallback(async (id: ID) => {
-    if (!e2eMode) await persistNotificationRead(id);
+    if (!isE2EMode) await persistNotificationRead(id);
     setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
   }, []);
 
   const markAllNotificationsRead = useCallback(async () => {
-    if (!e2eMode) await persistAllNotificationsRead(currentUserId);
+    if (!isE2EMode) await persistAllNotificationsRead(currentUserId);
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
   }, [currentUserId]);
 
   const updateProfile = useCallback(async (p: Profile) => {
-    if (!e2eMode) await persistProfile(p.id, profileToUpdate(p));
+    if (!isE2EMode) await persistProfile(p.id, profileToUpdate(p));
     setProfiles((prev) => prev.map((x) => (x.id === p.id ? p : x)));
   }, []);
 
@@ -459,70 +493,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
     () => ({
       route, navigate, currentUserId, profiles, groups, opportunities, spaces, conversations, notifications, trust,
       dataLoading, dataError, retryDataLoad,
-      createOpportunity, createSpaceFromOpportunity, updateSpace, addTask, updateTask, submitForReview, reviewTask,
-      toggleChecklistItem, toggleChecklistReview, updateModules, addMilestone, toggleMilestone, addDecision, addCheckIn,
+      createOpportunity, updateSpace, addTask, updateTask, submitForReview, reviewTask,
+      toggleChecklistItem, toggleChecklistReview, updateModules, addMilestone, toggleMilestone, addDecision,
       setCheckInFrequency, acknowledgeRecord, sendMessage, startConversation, markNotificationRead, markAllNotificationsRead,
       updateProfile, reportUser, reportOpportunity, submitAppeal,
     }),
     [route, navigate, currentUserId, profiles, groups, opportunities, spaces, conversations, notifications, trust,
      dataLoading, dataError, retryDataLoad,
-     createOpportunity, createSpaceFromOpportunity, updateSpace, addTask, updateTask, submitForReview, reviewTask,
-     toggleChecklistItem, toggleChecklistReview, updateModules, addMilestone, toggleMilestone, addDecision, addCheckIn,
+     createOpportunity, updateSpace, addTask, updateTask, submitForReview, reviewTask,
+     toggleChecklistItem, toggleChecklistReview, updateModules, addMilestone, toggleMilestone, addDecision,
      setCheckInFrequency, acknowledgeRecord, sendMessage, startConversation, markNotificationRead, markAllNotificationsRead,
      updateProfile, reportUser, reportOpportunity, submitAppeal]
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
-
-function defaultModules(category?: string): WorkspaceModule[] {
-  const core: { kind: ModuleKind; label: string }[] = [
-    { kind: 'team_chat', label: 'Team Chat' },
-    { kind: 'tasks', label: 'Tasks' },
-    { kind: 'milestones', label: 'Milestones' },
-    { kind: 'decision_log', label: 'Decision Log' },
-    { kind: 'collaboration_record', label: 'Collaboration Record' },
-    { kind: 'notes', label: 'Notes' },
-    { kind: 'files', label: 'Files' },
-    { kind: 'calendar', label: 'Calendar' },
-    { kind: 'project_timeline', label: 'Project Timeline' },
-  ];
-  const extraByCat: Record<string, { kind: ModuleKind; label: string }[]> = {
-    'Real Estate': [{ kind: 'property_tracker', label: 'Property Tracker' }, { kind: 'budget', label: 'Budget' }, { kind: 'vendors', label: 'Vendors' }],
-    Technology: [{ kind: 'hiring', label: 'Hiring' }, { kind: 'investors', label: 'Investors' }],
-    'Cleaning & Services': [{ kind: 'customer_pipeline', label: 'Customer Pipeline' }, { kind: 'hiring', label: 'Hiring' }, { kind: 'equipment_tracker', label: 'Equipment Tracker' }],
-    'Film & Media': [{ kind: 'contacts', label: 'Contacts' }, { kind: 'budget', label: 'Budget' }],
-    'E-commerce': [{ kind: 'customer_pipeline', label: 'Customer Pipeline' }, { kind: 'vendors', label: 'Vendors' }, { kind: 'budget', label: 'Budget' }],
-  };
-  const extra = (category && extraByCat[category]) || [];
-  return [...core, ...extra].map((m, i) => ({ kind: m.kind, label: m.label, pinned: i < 4, visible: true, order: i }));
-}
-
-export const MODULE_CATALOG: { kind: ModuleKind; label: string; description: string }[] = [
-  { kind: 'team_chat', label: 'Team Chat', description: 'Conversation for the team' },
-  { kind: 'tasks', label: 'Tasks', description: 'Tasks with checklists and reviews' },
-  { kind: 'calendar', label: 'Calendar', description: 'Dates and deadlines' },
-  { kind: 'milestones', label: 'Milestones', description: 'Key milestones' },
-  { kind: 'files', label: 'Files', description: 'Shared files' },
-  { kind: 'notes', label: 'Notes', description: 'Shared notes' },
-  { kind: 'budget', label: 'Budget', description: 'Budget tracker' },
-  { kind: 'contacts', label: 'Contacts', description: 'Contacts directory' },
-  { kind: 'vendors', label: 'Vendors', description: 'Vendor list' },
-  { kind: 'customer_pipeline', label: 'Customer Pipeline', description: 'Pipeline of leads and clients' },
-  { kind: 'property_tracker', label: 'Property Tracker', description: 'Properties and status' },
-  { kind: 'equipment_tracker', label: 'Equipment Tracker', description: 'Equipment inventory' },
-  { kind: 'investors', label: 'Investors', description: 'Investor pipeline' },
-  { kind: 'hiring', label: 'Hiring', description: 'Open roles and candidates' },
-  { kind: 'project_timeline', label: 'Project Timeline', description: 'Timeline of events' },
-  { kind: 'decision_log', label: 'Decision Log', description: 'Major decisions' },
-  { kind: 'collaboration_record', label: 'Collaboration Record', description: 'Reference record' },
-];
-
-export const MODULE_PRESETS: Record<string, ModuleKind[]> = {
-  'Real Estate Project': ['team_chat', 'tasks', 'milestones', 'property_tracker', 'budget', 'vendors', 'decision_log', 'collaboration_record', 'files', 'notes'],
-  'Technology Startup': ['team_chat', 'tasks', 'milestones', 'hiring', 'investors', 'project_timeline', 'decision_log', 'collaboration_record', 'files', 'notes'],
-  'Service Business': ['team_chat', 'tasks', 'milestones', 'customer_pipeline', 'hiring', 'equipment_tracker', 'budget', 'decision_log', 'collaboration_record', 'notes'],
-  'Creative Project': ['team_chat', 'tasks', 'milestones', 'contacts', 'budget', 'files', 'decision_log', 'collaboration_record', 'notes'],
-  'E-commerce Business': ['team_chat', 'tasks', 'milestones', 'customer_pipeline', 'vendors', 'budget', 'decision_log', 'collaboration_record', 'files', 'notes'],
-  'General Collaboration': ['team_chat', 'tasks', 'milestones', 'notes', 'files', 'decision_log', 'collaboration_record', 'project_timeline'],
-};

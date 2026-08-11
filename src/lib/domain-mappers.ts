@@ -11,6 +11,10 @@ import type {
   Profile,
   AppNotification,
   Task,
+  Professional,
+  ProfessionalCategory,
+  Company,
+  CompanySize,
   WorkStyle,
 } from '@/types';
 
@@ -74,10 +78,73 @@ export function mapProfileRow(row: Row): Profile {
   };
 }
 
+export function mapProfessionalRow(row: Row): Professional {
+  return {
+    id: row.id as string,
+    businessName: row.business_name as string,
+    logoUrl: (row.logo_url as string) || '',
+    category: row.category as ProfessionalCategory,
+    description: (row.description as string) || '',
+    services: (row.services as string[]) || [],
+    industriesServed: (row.industries_served as Industry[]) || [],
+    location: (row.location as string) || '',
+    remote: (row.remote as boolean) ?? true,
+    portfolio: (row.portfolio as Professional['portfolio']) || [],
+    certifications: (row.certifications as string[]) || [],
+    website: (row.website as string) || '',
+    yearsInBusiness: (row.years_in_business as number) || 1,
+    contactMethods: (row.contact_methods as string[]) || [],
+    responseTime: (row.response_time as string) || 'Within 24 hours',
+    pricingModel: (row.pricing_model as Professional['pricingModel']) || 'Contact for quote',
+    availability: (row.availability as Professional['availability']) || 'Available',
+    reviews: (row.professional_reviews as Professional['reviews']) || [],
+    verified: (row.verified as boolean) ?? false,
+    premium: (row.premium as boolean) ?? false,
+    sponsored: (row.sponsored as boolean) ?? false,
+    ownerId: (row.owner_id as string) || '',
+  };
+}
+
+export function mapCompanyRow(row: Row): Company {
+  return {
+    id: row.id as string,
+    name: row.name as string,
+    logoUrl: (row.logo_url as string) || '',
+    description: (row.description as string) || '',
+    mission: (row.mission as string) || '',
+    services: (row.services as string[]) || [],
+    industries: (row.industries as Industry[]) || [],
+    size: (row.size as CompanySize) || '1-10',
+    location: (row.location as string) || '',
+    website: (row.website as string) || '',
+    contactInfo: (row.contact_info as string) || '',
+    teamMemberIds: (row.team_member_ids as string[]) || [],
+    opportunityIds: (row.opportunity_ids as string[]) || [],
+    portfolio: (row.portfolio as Company['portfolio']) || [],
+    reviews: (row.company_reviews as Company['reviews']) || [],
+    verified: (row.verified as boolean) ?? false,
+    ownerId: (row.owner_id as string) || '',
+  };
+}
+
 export function mapSpaceRow(row: Row): CollaborationSpace {
   const members = (row.space_members as Row[]) || [];
   const memberIds = members.map((member) => member.user_id as string);
   const roles = Object.fromEntries(members.map((member) => [member.user_id as string, (member.role as string) || 'Member']));
+  const milestones = ((row.milestones as Row[]) || []).map((milestone) => ({
+    id: milestone.id as string,
+    title: milestone.title as string,
+    dueDate: (milestone.due_date as string) || '',
+    done: (milestone.done as boolean) ?? false,
+  }));
+  const decisions = ((row.decisions as Row[]) || []).map((decision) => ({
+    id: decision.id as string,
+    title: decision.title as string,
+    decidedAt: (decision.decided_at as string) || '',
+    by: (decision.decided_by as string) || '',
+    rationale: (decision.rationale as string) || '',
+  }));
+  const opportunityCreatorId = (members.find((member) => member.role === 'Lead')?.user_id as string) || memberIds[0] || '';
   return {
     id: row.id as string,
     opportunityId: row.opportunity_id as string,
@@ -88,12 +155,7 @@ export function mapSpaceRow(row: Row): CollaborationSpace {
     memberIds,
     roles,
     tasks: ((row.tasks as Row[]) || []).map(mapTaskRow),
-    milestones: ((row.milestones as Row[]) || []).map((milestone) => ({
-      id: milestone.id as string,
-      title: milestone.title as string,
-      dueDate: (milestone.due_date as string) || '',
-      done: (milestone.done as boolean) ?? false,
-    })),
+    milestones,
     files: ((row.space_files as Row[]) || []).map((file) => ({
       id: file.id as string,
       name: file.name as string,
@@ -101,31 +163,29 @@ export function mapSpaceRow(row: Row): CollaborationSpace {
       at: (file.uploaded_at as string) || '',
     })),
     notes: (row.notes as string) || '',
-    decisions: ((row.decisions as Row[]) || []).map((decision) => ({
-      id: decision.id as string,
-      title: decision.title as string,
-      decidedAt: (decision.decided_at as string) || '',
-      by: (decision.decided_by as string) || '',
-      rationale: (decision.rationale as string) || '',
-    })),
+    decisions,
     activity: ((row.activity_log as Row[]) || []).map((activity) => ({
       id: activity.id as string,
       at: (activity.at as string) || '',
       text: activity.text as string,
       actorId: activity.actor_id as string | undefined,
     })),
-    modules: defaultSpaceModules,
+    modules: Array.isArray(row.modules) && row.modules.length
+      ? row.modules as CollaborationSpace['modules']
+      : defaultSpaceModules,
     record: {
       projectName: row.name as string,
-      opportunityCreatorId: memberIds[0] || '',
+      opportunityCreatorId,
       ideaOrigin: 'Created from an opportunity listing.',
       beganAt: ((row.created_at as string) || '').slice(0, 10),
       participants: memberIds.map((profileId) => ({ profileId, role: roles[profileId], expectedContribution: '', responsibilities: '' })),
       goals: [],
-      milestones: [],
+      milestones: milestones.map((milestone) => milestone.title),
       communicationExpectations: '',
-      majorDecisions: [],
-      acknowledgments: [],
+      majorDecisions: decisions,
+      acknowledgments: ((row.collaboration_record_acknowledgments as Row[]) || [])
+        .map((acknowledgment) => acknowledgment.user_id as string)
+        .filter(Boolean),
     },
     checkIns: [],
     checkInFrequency: (row.check_in_frequency as CollaborationSpace['checkInFrequency']) || 'Weekly',
