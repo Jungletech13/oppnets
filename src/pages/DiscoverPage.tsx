@@ -49,7 +49,7 @@ export function DiscoverPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-400" />
           <input className="input pl-9" placeholder="Search by title, description, or skill..." value={query} onChange={(e) => setQuery(e.target.value)} />
         </div>
-        <button onClick={() => setShowFilters((v) => !v)} className="btn-secondary">
+        <button aria-expanded={showFilters} onClick={() => setShowFilters((v) => !v)} className="btn-secondary">
           <SlidersHorizontal className="w-4 h-4" /> Filters
         </button>
       </div>
@@ -63,7 +63,7 @@ export function DiscoverPage() {
           <FilterSelect label="Location" value={location} onChange={setLocation} options={LOCATIONS} />
           <div>
             <label className="label">Verified only</label>
-            <button onClick={() => setVerifiedOnly((v) => !v)} className={`btn w-full ${verifiedOnly ? 'bg-accent-50 text-accent-700 border-accent-200' : 'bg-white text-ink-700 border-ink-200'}`}>
+            <button aria-pressed={verifiedOnly} onClick={() => setVerifiedOnly((v) => !v)} className={`btn w-full ${verifiedOnly ? 'bg-accent-50 text-accent-700 border-accent-200' : 'bg-white text-ink-700 border-ink-200'}`}>
               <ShieldCheck className="w-4 h-4" /> {verifiedOnly ? 'Showing verified' : 'Show verified only'}
             </button>
           </div>

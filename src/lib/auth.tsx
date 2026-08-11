@@ -14,6 +14,32 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
+const E2E_AUTH_STORAGE_KEY = 'oppnets:e2e-authenticated';
+const e2eMode = import.meta.env.DEV && import.meta.env.VITE_E2E_MODE === 'true';
+
+function createE2ESession(): Session {
+  const now = Math.floor(Date.now() / 1000);
+  return {
+    access_token: 'oppnets-e2e-access-token',
+    refresh_token: 'oppnets-e2e-refresh-token',
+    expires_in: 3600,
+    expires_at: now + 3600,
+    token_type: 'bearer',
+    user: {
+      id: 'p-me',
+      app_metadata: {},
+      user_metadata: { name: 'OppNets Test User' },
+      aud: 'authenticated',
+      created_at: new Date(now * 1000).toISOString(),
+      email: 'returning.user@oppnets.test',
+    },
+  };
+}
+
+function hasE2ESession(): boolean {
+  return e2eMode && window.localStorage.getItem(E2E_AUTH_STORAGE_KEY) === 'true';
+}
+
 const refreshCookieName = 'oppnets_refresh_token';
 
 function saveRefreshToken(token: string) {
@@ -31,10 +57,12 @@ function clearRefreshToken() {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [session, setSession] = useState<Session | null>(() => hasE2ESession() ? createE2ESession() : null);
+  const [loading, setLoading] = useState(!e2eMode);
 
   useEffect(() => {
+    if (e2eMode) return;
+
     let active = true;
     let initialized = false;
 
@@ -79,18 +107,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isAdmin = (session?.user?.app_metadata?.role as string | undefined) === 'admin';
 
   const signUp = async (email: string, password: string) => {
+    if (e2eMode) {
+      if (!email.endsWith('@oppnets.test') || password.length < 6) {
+        return { error: 'Use an @oppnets.test address and a password of at least 6 characters in E2E mode.' };
+      }
+      window.localStorage.setItem(E2E_AUTH_STORAGE_KEY, 'true');
+      setSession(createE2ESession());
+      return { error: null };
+    }
     const { data, error } = await supabase.auth.signUp({ email, password });
     if (data.session) saveRefreshToken(data.session.refresh_token);
     return { error: error?.message ?? null };
   };
 
   const signIn = async (email: string, password: string) => {
+    if (e2eMode) {
+      if (email !== 'returning.user@oppnets.test' || password !== 'OppNetsTest1!') {
+        return { error: 'Invalid E2E test credentials.' };
+      }
+      window.localStorage.setItem(E2E_AUTH_STORAGE_KEY, 'true');
+      setSession(createE2ESession());
+      return { error: null };
+    }
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (data.session) saveRefreshToken(data.session.refresh_token);
     return { error: error?.message ?? null };
   };
 
   const signOut = async () => {
+    if (e2eMode) {
+      window.localStorage.removeItem(E2E_AUTH_STORAGE_KEY);
+      setSession(null);
+      return;
+    }
     clearRefreshToken();
     await supabase.auth.signOut();
   };

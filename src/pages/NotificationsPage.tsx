@@ -1,7 +1,7 @@
 import { useApp } from '@/store';
 import { PageHeader } from '@/components/AppShell';
 import { Card, Badge, EmptyState } from '@/components/ui';
-import { Bell, CheckCheck, CheckCircle2, AlertTriangle, Clock, MessageSquare, ListChecks, Handshake, UserPlus, ArrowRight, Zap } from 'lucide-react';
+import { Bell, CheckCheck, CheckCircle2, Clock, MessageSquare, ListChecks, Handshake, UserPlus, ArrowRight, Zap } from 'lucide-react';
 import type { NotificationKind } from '@/types';
 
 const kindIcon: Record<NotificationKind, typeof Bell> = {
@@ -38,7 +38,7 @@ export function NotificationsPage() {
                 {actionable.map((n) => {
                   const Icon = kindIcon[n.kind] || Bell;
                   return (
-                    <div key={n.id} className={`flex items-start gap-3 p-4 ${n.read ? '' : 'bg-amber-50/40'}`}>
+                    <div key={n.id} className={`flex flex-col sm:flex-row sm:items-start gap-3 p-4 ${n.read ? '' : 'bg-amber-50/40'}`}>
                       <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${n.read ? 'bg-ink-100 text-ink-400' : 'bg-amber-100 text-amber-600'}`}>
                         <Icon className="w-4 h-4" />
                       </div>
@@ -46,7 +46,7 @@ export function NotificationsPage() {
                         <p className={`text-sm ${n.read ? 'text-ink-600' : 'text-ink-900 font-medium'}`}>{n.text}</p>
                         <p className="text-xs text-ink-400 mt-0.5">{new Date(n.at).toLocaleDateString()}</p>
                       </div>
-                      <div className="flex items-center gap-2 shrink-0">
+                      <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
                         <button onClick={() => { markNotificationRead(n.id); if (n.link) navigate(parseLink(n.link)); }} className="btn-secondary text-xs whitespace-nowrap">
                           Open <ArrowRight className="w-3 h-3" />
                         </button>

@@ -4,10 +4,10 @@ import { PageHeader } from '@/components/AppShell';
 import { Card, Badge, Avatar, ProgressBar, StatusPill, SectionHeader, Modal, Field, EmptyState, BetaNote } from '@/components/ui';
 import {
   CheckCircle2, Circle, AlertTriangle, Clock, Plus, X, ListChecks, MessageSquare, Calendar, Milestone as MilestoneIcon,
-  FileText, StickyNote, Users, Settings, Gavel, ClipboardList, Handshake, ChevronRight, ArrowLeft, ShieldCheck, GripVertical, Eye, EyeOff, Pin, PinOff, LayoutTemplate, Target, Flag,
+  FileText, StickyNote, Users, Settings, Gavel, ClipboardList, ChevronRight, ArrowLeft, ShieldCheck, GripVertical, Eye, EyeOff, Pin, PinOff, LayoutTemplate, Target, Flag,
 } from 'lucide-react';
 import { getProfile } from '@/data';
-import type { CollaborationSpace, Task, ModuleKind, WorkspaceModule, Milestone, Decision, CheckIn, CheckInFrequency } from '@/types';
+import type { CollaborationSpace, Task, ModuleKind, WorkspaceModule, CheckInFrequency } from '@/types';
 
 type Tab = 'dashboard' | 'tasks' | 'chat' | 'milestones' | 'decisions' | 'record' | 'notes' | 'files' | 'settings' | 'toolkit';
 
@@ -19,7 +19,7 @@ const MODULE_ICONS: Record<string, typeof ListChecks> = {
 };
 
 export function SpacePage({ spaceId }: { spaceId: string }) {
-  const { spaces, navigate, currentUserId } = useApp();
+  const { spaces, navigate } = useApp();
   const space = spaces.find((s) => s.id === spaceId);
   const [tab, setTab] = useState<Tab>('dashboard');
 
@@ -113,7 +113,7 @@ export function SpacePage({ spaceId }: { spaceId: string }) {
           {tab === 'notes' && <NotesTab space={space} />}
           {tab === 'files' && <FilesTab space={space} />}
           {tab === 'settings' && <SettingsTab space={space} />}
-          {tab === 'toolkit' && <ToolkitTab space={space} />}
+          {tab === 'toolkit' && <ToolkitTab />}
         </div>
       </div>
     </div>
@@ -192,7 +192,7 @@ function DashboardTab({ space, overallProgress, setTab }: { space: Collaboration
         <SectionHeader title="My tasks" action={<button onClick={() => setTab('tasks')} className="btn-ghost text-sm">All tasks <ChevronRight className="w-4 h-4" /></button>} />
         {myTasks.length === 0 ? <p className="text-sm text-ink-500">No tasks assigned to you.</p> : (
           <div className="space-y-2">
-            {myTasks.slice(0, 5).map((t) => <TaskRow key={t.id} task={t} space={space} compact />)}
+            {myTasks.slice(0, 5).map((t) => <TaskRow key={t.id} task={t} compact />)}
           </div>
         )}
       </Card>
@@ -260,10 +260,10 @@ function TasksTab({ space }: { space: CollaborationSpace }) {
         <EmptyState icon={<ListChecks className="w-5 h-5" />} title="No tasks yet" description="Create your first task to start tracking progress." action={<button onClick={() => setShowNew(true)} className="btn-primary"><Plus className="w-4 h-4" /> New task</button>} />
       ) : (
         <div className="space-y-5">
-          <TaskGroup label="Ready for review" tasks={byStatus(['Ready for review'])} space={space} onSelect={setSelectedTask} />
-          <TaskGroup label="In progress" tasks={byStatus(['In progress', 'Not started'])} space={space} onSelect={setSelectedTask} />
-          <TaskGroup label="Needs attention" tasks={byStatus(['Blocked', 'Changes requested', 'Needs discussion'])} space={space} onSelect={setSelectedTask} />
-          <TaskGroup label="Approved & completed" tasks={byStatus(['Approved', 'Completed'])} space={space} onSelect={setSelectedTask} />
+          <TaskGroup label="Ready for review" tasks={byStatus(['Ready for review'])} onSelect={setSelectedTask} />
+          <TaskGroup label="In progress" tasks={byStatus(['In progress', 'Not started'])} onSelect={setSelectedTask} />
+          <TaskGroup label="Needs attention" tasks={byStatus(['Blocked', 'Changes requested', 'Needs discussion'])} onSelect={setSelectedTask} />
+          <TaskGroup label="Approved & completed" tasks={byStatus(['Approved', 'Completed'])} onSelect={setSelectedTask} />
         </div>
       )}
 
@@ -272,19 +272,19 @@ function TasksTab({ space }: { space: CollaborationSpace }) {
   );
 }
 
-function TaskGroup({ label, tasks, space, onSelect }: { label: string; tasks: Task[]; space: CollaborationSpace; onSelect: (t: Task) => void }) {
+function TaskGroup({ label, tasks, onSelect }: { label: string; tasks: Task[]; onSelect: (t: Task) => void }) {
   if (tasks.length === 0) return null;
   return (
     <div>
       <h3 className="text-sm font-semibold text-ink-700 mb-2">{label} <span className="text-ink-400">({tasks.length})</span></h3>
       <div className="space-y-2">
-        {tasks.map((t) => <TaskRow key={t.id} task={t} space={space} onClick={() => onSelect(t)} />)}
+        {tasks.map((t) => <TaskRow key={t.id} task={t} onClick={() => onSelect(t)} />)}
       </div>
     </div>
   );
 }
 
-function TaskRow({ task, space, onClick, compact }: { task: Task; space: CollaborationSpace; onClick?: () => void; compact?: boolean }) {
+function TaskRow({ task, onClick, compact }: { task: Task; onClick?: () => void; compact?: boolean }) {
   const { done, total, approvedPct } = taskProgress(task);
   const owner = getProfile(task.ownerId);
   const overdue = new Date(task.dueDate) < new Date() && task.status !== 'Completed' && task.status !== 'Approved';
@@ -697,7 +697,7 @@ function DecisionsTab({ space }: { space: CollaborationSpace }) {
 
 // ===== Collaboration Record =====
 function RecordTab({ space }: { space: CollaborationSpace }) {
-  const { acknowledgeRecord, currentUserId, profiles } = useApp();
+  const { acknowledgeRecord, currentUserId } = useApp();
   const [print, setPrint] = useState(false);
   const r = space.record;
   const me = currentUserId;
@@ -830,7 +830,6 @@ function SettingsTab({ space }: { space: CollaborationSpace }) {
   const applyPreset = (preset: ModuleKind[]) => {
     const newModules = MODULE_CATALOG.map((mc) => {
       const inPreset = preset.includes(mc.kind);
-      const existing = modules.find((m) => m.kind === mc.kind);
       return { kind: mc.kind, label: mc.label, pinned: inPreset && preset.indexOf(mc.kind) < 4, visible: inPreset, order: preset.indexOf(mc.kind) >= 0 ? preset.indexOf(mc.kind) : 99 };
     }).filter((m) => m.visible);
     setModules(newModules);
@@ -894,7 +893,7 @@ function CheckInSettings({ space }: { space: CollaborationSpace }) {
 }
 
 // ===== Toolkit =====
-function ToolkitTab({ space }: { space: CollaborationSpace }) {
+function ToolkitTab() {
   return (
     <div className="space-y-4">
       <SectionHeader title="Founder & Collaboration Toolkit" subtitle="Non-legal planning resources." />

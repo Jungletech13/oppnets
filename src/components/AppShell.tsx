@@ -102,17 +102,17 @@ export function AppShell({ children }: { children: ReactNode }) {
           <div className="w-7 h-7 rounded-lg bg-brand-600 text-white flex items-center justify-center font-bold text-xs">ON</div>
           <span className="font-semibold text-ink-900 text-sm">Opportunity Network</span>
         </div>
-        <button onClick={() => setMobileOpen(true)} className="p-2 -mr-2 text-ink-600">
+        <button aria-label="Open navigation" aria-expanded={mobileOpen} onClick={() => setMobileOpen(true)} className="min-w-11 min-h-11 -my-2 -mr-2 flex items-center justify-center text-ink-600">
           <Menu className="w-5 h-5" />
         </button>
       </div>
 
       {/* Mobile drawer */}
       {mobileOpen && (
-        <div className="lg:hidden fixed inset-0 z-50 flex">
+        <div className="lg:hidden fixed inset-0 z-50 flex" role="dialog" aria-modal="true" aria-label="Navigation">
           <div className="absolute inset-0 bg-ink-900/40" onClick={() => setMobileOpen(false)} />
           <div className="relative w-72 max-w-[80%] bg-white shadow-xl flex flex-col animate-fadein">
-            <button onClick={() => setMobileOpen(false)} className="absolute top-3 right-3 text-ink-400 z-10">
+            <button aria-label="Close navigation" onClick={() => setMobileOpen(false)} className="absolute top-1 right-1 min-w-11 min-h-11 flex items-center justify-center text-ink-400 z-10">
               <X className="w-5 h-5" />
             </button>
             {sidebar}
@@ -122,7 +122,12 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       {/* Main content */}
       <div className="lg:pl-64">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8">{children}</div>
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
+          <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800" role="note">
+            Preview build: sample people, reviews, verifications, partners, offers, and outcomes are demonstration data—not real claims.
+          </div>
+          {children}
+        </div>
       </div>
     </div>
   );

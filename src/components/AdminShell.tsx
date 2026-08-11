@@ -77,16 +77,16 @@ export function AdminShell({ children }: { children: ReactNode }) {
           <div className="w-7 h-7 rounded-lg bg-ink-900 text-white flex items-center justify-center font-bold text-xs">A</div>
           <span className="font-semibold text-ink-900 text-sm">OppNets Admin</span>
         </div>
-        <button onClick={() => setMobileOpen(true)} className="p-2 -mr-2 text-ink-600">
+        <button aria-label="Open admin navigation" aria-expanded={mobileOpen} onClick={() => setMobileOpen(true)} className="min-w-11 min-h-11 -my-2 -mr-2 flex items-center justify-center text-ink-600">
           <Menu className="w-5 h-5" />
         </button>
       </div>
 
       {mobileOpen && (
-        <div className="lg:hidden fixed inset-0 z-50 flex">
+        <div className="lg:hidden fixed inset-0 z-50 flex" role="dialog" aria-modal="true" aria-label="Admin navigation">
           <div className="absolute inset-0 bg-ink-900/40" onClick={() => setMobileOpen(false)} />
           <div className="relative w-72 max-w-[80%] bg-white shadow-xl flex flex-col animate-fadein">
-            <button onClick={() => setMobileOpen(false)} className="absolute top-3 right-3 text-ink-400 z-10">
+            <button aria-label="Close admin navigation" onClick={() => setMobileOpen(false)} className="absolute top-1 right-1 min-w-11 min-h-11 flex items-center justify-center text-ink-400 z-10">
               <X className="w-5 h-5" />
             </button>
             {sidebar}

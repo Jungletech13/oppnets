@@ -1,4 +1,4 @@
-import { useId, type ReactNode } from 'react';
+import { Children, cloneElement, isValidElement, useId, type ReactElement, type ReactNode } from 'react';
 import type { VerificationClaim } from '@/types';
 import { CheckCircle2, Clock, AlertTriangle, XCircle, ShieldCheck, Sparkles } from 'lucide-react';
 
@@ -126,6 +126,14 @@ export function Card({ children, className = '', hover = false, onClick, style }
   return (
     <div
       onClick={onClick}
+      onKeyDown={onClick ? (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onClick();
+        }
+      } : undefined}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
       style={style}
       className={`${hover ? 'card-hover cursor-pointer' : 'card'} ${className}`}
     >
@@ -138,7 +146,7 @@ export function Modal({ open, onClose, title, children, wide = false }: { open: 
   const titleId = useId();
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink-900/40 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-ink-900/40 backdrop-blur-sm" onClick={onClose}>
       <div
         role="dialog"
         aria-modal="true"
@@ -157,10 +165,33 @@ export function Modal({ open, onClose, title, children, wide = false }: { open: 
 }
 
 export function Field({ label, children, hint, required = false }: { label: string; children: ReactNode; hint?: string; required?: boolean }) {
+  const controlId = useId();
+  let controlFound = false;
+  let connectedControlId: string | undefined;
+
+  const connectLabel = (node: ReactNode): ReactNode => Children.map(node, (child) => {
+    if (!isValidElement(child) || controlFound) return child;
+
+    const element = child as ReactElement<{ id?: string; children?: ReactNode }>;
+    if (typeof element.type === 'string' && ['input', 'select', 'textarea'].includes(element.type)) {
+      controlFound = true;
+      connectedControlId = element.props.id ?? controlId;
+      return cloneElement(element, { id: connectedControlId });
+    }
+
+    if (element.props.children) {
+      return cloneElement(element, { children: connectLabel(element.props.children) });
+    }
+
+    return child;
+  });
+
+  const labeledChildren = connectLabel(children);
+
   return (
     <div>
-      <label className="label">{label}{required && <span className="text-red-500"> *</span>}</label>
-      {children}
+      <label className="label" htmlFor={connectedControlId}>{label}{required && <span className="text-red-500" aria-hidden="true"> *</span>}</label>
+      {labeledChildren}
       {hint && <p className="text-xs text-ink-400 mt-1">{hint}</p>}
     </div>
   );

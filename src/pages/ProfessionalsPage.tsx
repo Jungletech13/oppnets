@@ -4,7 +4,7 @@ import { PageHeader } from '@/components/AppShell';
 import { Card, Badge, EmptyState, Avatar, Modal, Field } from '@/components/ui';
 import { Search, MapPin, Star, ShieldCheck, Sparkles, Store, Plus, Bookmark, BookmarkCheck, AlertCircle } from 'lucide-react';
 import { PROFESSIONALS as DEMO_PROFESSIONALS } from '@/data-phase2';
-import { fetchProfessionals, createProfessional, toggleSavedListing, isListingSaved } from '@/lib/queries';
+import { fetchProfessionals, createProfessional, fetchSavedListings, toggleSavedListing } from '@/lib/queries';
 import { useAuth } from '@/lib/auth';
 import type { Industry, Professional, ProfessionalCategory } from '@/types';
 
@@ -63,11 +63,8 @@ export function ProfessionalsPage() {
       }));
       setDbPros(mapped);
       if (session) {
-        const saved = new Set<string>();
-        for (const p of mapped) {
-          if (await isListingSaved('professional', p.id)) saved.add(p.id);
-        }
-        setSavedIds(saved);
+        const saved = await fetchSavedListings();
+        setSavedIds(new Set((saved ?? []).filter((row) => row.listing_type === 'professional').map((row) => row.listing_id)));
       }
     } catch {
       setError('Could not load professionals. Showing demo data instead.');
@@ -134,8 +131,8 @@ export function ProfessionalsPage() {
       </div>
 
       <div className="flex flex-wrap gap-2 mb-5">
-        <button onClick={() => setRemoteOnly(!remoteOnly)} className={`text-xs rounded-full px-3 py-1.5 border transition-colors ${remoteOnly ? 'bg-brand-600 text-white border-brand-600' : 'bg-white text-ink-600 border-ink-200'}`}>Remote OK</button>
-        <button onClick={() => setVerifiedOnly(!verifiedOnly)} className={`text-xs rounded-full px-3 py-1.5 border transition-colors ${verifiedOnly ? 'bg-brand-600 text-white border-brand-600' : 'bg-white text-ink-600 border-ink-200'}`}>Verified only</button>
+        <button aria-pressed={remoteOnly} onClick={() => setRemoteOnly(!remoteOnly)} className={`min-h-11 text-xs rounded-full px-3 py-1.5 border transition-colors ${remoteOnly ? 'bg-brand-600 text-white border-brand-600' : 'bg-white text-ink-600 border-ink-200'}`}>Remote OK</button>
+        <button aria-pressed={verifiedOnly} onClick={() => setVerifiedOnly(!verifiedOnly)} className={`min-h-11 text-xs rounded-full px-3 py-1.5 border transition-colors ${verifiedOnly ? 'bg-brand-600 text-white border-brand-600' : 'bg-white text-ink-600 border-ink-200'}`}>Verified only</button>
       </div>
 
       {loading ? (
@@ -173,7 +170,7 @@ function ProfessionalCard({ pro, saved, onSave, onClick }: { pro: Professional; 
   return (
     <div className="relative">
       {onSave && (
-        <button onClick={(e) => { e.stopPropagation(); onSave(); }} className="absolute top-2 right-2 z-10 p-1.5 bg-white/90 rounded-full hover:bg-white shadow-sm transition-colors">
+        <button aria-label={saved ? `Remove ${pro.businessName} from saved listings` : `Save ${pro.businessName}`} onClick={(e) => { e.stopPropagation(); onSave(); }} className="absolute top-1 right-1 z-10 min-w-11 min-h-11 flex items-center justify-center bg-white/90 rounded-full hover:bg-white shadow-sm transition-colors">
           {saved ? <BookmarkCheck className="w-4 h-4 text-brand-600" /> : <Bookmark className="w-4 h-4 text-ink-400" />}
         </button>
       )}
@@ -267,7 +264,7 @@ function CreateProfessionalModal({ onClose, onCreated }: { onClose: () => void; 
           <input className="input" value={services} onChange={(e) => setServices(e.target.value)} placeholder="Entity Formation, Contract Drafting..." />
         </Field>
         <Field label="Website">
-          <input className="input" value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://..." />
+          <input type="url" className="input" value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://..." />
         </Field>
         <label className="flex items-center gap-2 text-sm text-ink-700">
           <input type="checkbox" checked={remote} onChange={(e) => setRemote(e.target.checked)} className="rounded" /> Available remotely

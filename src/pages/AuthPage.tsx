@@ -103,7 +103,7 @@ export function AuthPage() {
           </p>
         </Card>
 
-        <BetaNote>Authentication is powered by Supabase. Email confirmation is disabled for this prototype.</BetaNote>
+        <BetaNote>Authentication is powered by Supabase. New accounts can sign in immediately.</BetaNote>
       </div>
     </div>
   );

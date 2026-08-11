@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import {
   Users, Briefcase, Building2, Store, MessageSquare, ShieldCheck, AlertTriangle,
-  TrendingUp, Activity, Clock, FileText, CheckCircle2,
+  TrendingUp, Activity, Clock, FileText,
 } from 'lucide-react';
 import { AdminPageHeader } from '@/components/AdminShell';
-import { Card, Badge } from '@/components/ui';
+import { Card } from '@/components/ui';
 import { fetchPlatformStats, fetchRecentActivity, type PlatformStats } from '@/lib/admin-queries';
 
 export function AdminDashboardPage() {

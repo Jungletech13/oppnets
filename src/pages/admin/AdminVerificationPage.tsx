@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { ShieldCheck, CheckCircle2, XCircle, Clock, FileText } from 'lucide-react';
 import { AdminPageHeader } from '@/components/AdminShell';
 import { Card, Badge, Modal, EmptyState } from '@/components/ui';
@@ -23,11 +23,7 @@ export function AdminVerificationPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadClaims();
-  }, [tab]);
-
-  async function loadClaims() {
+  const loadClaims = useCallback(async () => {
     setLoading(true);
     try {
       const data = await fetchVerificationQueue(tab === 'all' ? 'all' : tab);
@@ -37,7 +33,11 @@ export function AdminVerificationPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [tab]);
+
+  useEffect(() => {
+    loadClaims();
+  }, [loadClaims]);
 
   async function handleApprove() {
     if (!selected || !reason.trim()) return;

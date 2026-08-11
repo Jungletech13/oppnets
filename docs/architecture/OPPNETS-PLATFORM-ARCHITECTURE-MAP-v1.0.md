@@ -1,5 +1,5 @@
 # OPPNETS PLATFORM ARCHITECTURE MAP
-## Version 1.0
+## Version 1.0 with August 6, 2026 Infrastructure Amendment
 
 **Status: GOVERNING ARCHITECTURE DOCUMENT**
 **Date: July 26, 2026**
@@ -44,7 +44,7 @@ OppNets is a six-layer platform. Each layer has a distinct mission, distinct res
                    │ hosted on
 ┌──────────────────▼──────────────────────────┐
 │            INFRASTRUCTURE LAYER               │  Authority: Operations
-│  Bolt, GitHub, Supabase, Cloudflare, Stripe   │
+│ GitHub, Cloudflare, Supabase, Resend, Stripe  │
 └─────────────────────────────────────────────┘
 ```
 
@@ -596,7 +596,7 @@ Provide the engineering foundation: authentication, database, row-level security
 
 ### Dependencies
 
-- Depends on: Infrastructure Layer (Supabase, Bolt)
+- Depends on: Infrastructure Layer (Supabase, Cloudflare)
 - Serves: All layers above
 
 ### Future Phases
@@ -616,20 +616,21 @@ Provide the hosting, version control, database hosting, CDN, and payment process
 
 ### Responsibilities
 
-- Application hosting and build pipeline (Bolt)
+- Application hosting and build pipeline (Cloudflare Pages connected to GitHub)
 - Source code repository (GitHub)
 - Database, auth, realtime, storage, edge functions (Supabase)
-- CDN and DNS (Cloudflare — future)
+- CDN and DNS (Cloudflare)
+- Transactional email delivery (Resend)
 - Payment processing (Stripe — future)
 
 ### Existing Infrastructure
 
 | Service | Status | Usage |
 |---|---|---|
-| Bolt | Operational | Application build, dev server, deployment |
 | GitHub | Operational | Source code repository |
-| Supabase | Operational | Database (Postgres), Auth, Realtime, Edge Functions (available, not deployed) |
-| Cloudflare | Not configured | CDN, DNS — future |
+| Supabase | Operational | Database (Postgres), Auth, Realtime, Storage, Edge Functions |
+| Cloudflare | In progress | DNS is owner-controlled; Pages production cutover pending |
+| Resend | Operational | Verified `oppnets.com` transactional-email domain |
 | Stripe | Not configured | Payment processing — future |
 
 ### Existing Configuration
@@ -637,17 +638,17 @@ Provide the hosting, version control, database hosting, CDN, and payment process
 | Component | Status |
 |---|---|
 | Supabase project | Provisioned |
-| Environment variables | Configured (Supabase URL, anon key, service role key) |
-| Database migrations | 9 migrations applied |
+| Environment variables | Public frontend variables documented; server secrets remain in owner-controlled services |
+| Database migrations | 15 migrations in GitHub; live migration audit pending |
 | RLS policies | Enabled on all tables |
 | Realtime | Enabled on 5 tables |
-| Edge Functions | None deployed |
+| Edge Functions | Legacy email source recovered but quarantined pending secure replacement |
 
 ### Planned Work
 
 | Item | Status |
 |---|---|
-| Cloudflare DNS/CDN setup | Future |
+| Cloudflare Pages production deployment | In progress |
 | Stripe account setup | Future (Phase 5.x) |
 | Edge Function deployment | Planned (Phase 4.x) |
 | Storage bucket configuration | Planned |
@@ -781,7 +782,7 @@ Every major approved artifact in the OppNets platform is assigned a permanent do
 | Business Layer | Operational | Subscription plans, entitlements, user subscriptions, company seats, and seat assignments all implemented. Pricing page operational. Admin subscription management operational. No payment processing yet. |
 | Marketplace Layer | Operational | 22 pages operational covering opportunities, people, professionals, companies, collaboration, messaging, notifications, success stories, resources, and builder partners. SEO pages, public profiles, industry/location landing pages, and analytics dashboards not yet implemented. |
 | Platform Layer | Operational | Auth, database (27+ tables), RLS, realtime (5 tables), and auditing all operational. Edge Functions not deployed. Storage not configured. RPC library partial. |
-| Infrastructure Layer | Operational | Bolt, GitHub, Supabase all operational. Cloudflare and Stripe not configured. |
+| Infrastructure Layer | In Progress | GitHub, Supabase, Cloudflare, and Resend are independently owner-controlled. Cloudflare Pages cutover and final credential rotation remain; Stripe is not configured. |
 
 ### Summary
 

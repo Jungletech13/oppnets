@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { PageHeader } from '@/components/AppShell';
-import { Card, Badge, Avatar } from '@/components/ui';
-import { Wrench, ExternalLink, CheckCircle2 } from 'lucide-react';
+import { Card, Badge, Avatar, BetaNote } from '@/components/ui';
+import { CheckCircle2 } from 'lucide-react';
 import { BUILDER_PARTNERS } from '@/data-phase2';
 import type { PartnerCategory } from '@/types';
 
@@ -17,11 +17,12 @@ export function BuilderPartnersPage() {
 
   return (
     <div>
-      <PageHeader title="Builder Partners" subtitle="Trusted business tools and services to help you build and grow your venture. Educational, not promotional." />
+      <PageHeader title="Builder Resources" subtitle="Business-tool categories that may support a venture." />
+      <div className="mb-5"><BetaNote>Resource categories only. Provider listings and member offers will appear only after they are reviewed and configured by OppNets.</BetaNote></div>
 
       <div className="flex flex-wrap gap-2 mb-5">
         {CATEGORIES.map((c) => (
-          <button key={c} onClick={() => setCategory(c)} className={`text-xs rounded-full px-3 py-1.5 border transition-colors ${category === c ? 'bg-brand-600 text-white border-brand-600' : 'bg-white text-ink-600 border-ink-200 hover:border-brand-300'}`}>{c}</button>
+          <button aria-pressed={category === c} key={c} onClick={() => setCategory(c)} className={`min-h-11 text-xs rounded-full px-3 py-1.5 border transition-colors ${category === c ? 'bg-brand-600 text-white border-brand-600' : 'bg-white text-ink-600 border-ink-200 hover:border-brand-300'}`}>{c}</button>
         ))}
       </div>
 
@@ -36,14 +37,9 @@ export function BuilderPartnersPage() {
               </div>
             </div>
             <p className="text-xs text-ink-600 mb-3">{p.description}</p>
-            {p.offer && (
-              <div className="flex items-start gap-1.5 text-xs text-accent-700 bg-accent-50 rounded-lg p-2 mb-3">
-                <CheckCircle2 className="w-3.5 h-3.5 mt-0.5 shrink-0" /> {p.offer}
-              </div>
-            )}
-            <a href={p.website} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-xs text-brand-600 hover:underline">
-              Learn more <ExternalLink className="w-3 h-3" />
-            </a>
+            <div className="flex items-center gap-1.5 text-xs text-ink-400">
+              <CheckCircle2 className="w-3.5 h-3.5" /> Provider link and any member offer are not configured.
+            </div>
           </Card>
         ))}
       </div>

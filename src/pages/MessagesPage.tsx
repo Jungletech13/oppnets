@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useApp } from '@/store';
 import { PageHeader } from '@/components/AppShell';
 import { Card, Avatar, EmptyState, Badge } from '@/components/ui';
-import { MessageSquare, Send, Users, ListChecks, Gavel, FileText, ClipboardList, CheckCircle2, Circle } from 'lucide-react';
+import { ArrowLeft, MessageSquare, Send, Users, ListChecks, Gavel, FileText, ClipboardList, Circle } from 'lucide-react';
 
 export function MessagesPage() {
   const { conversations, currentUserId, sendMessage, navigate, spaces, profiles } = useApp();
@@ -10,6 +10,7 @@ export function MessagesPage() {
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
+  const [mobileThreadOpen, setMobileThreadOpen] = useState(false);
 
   const active = conversations.find((c) => c.id === activeId);
   const activeSpace = active?.spaceId ? spaces.find((s) => s.id === active.spaceId) : undefined;
@@ -23,7 +24,7 @@ export function MessagesPage() {
       <PageHeader title="Messages" subtitle="Conversations tied to projects, tasks, and decisions — not generic chat." />
       <div className="grid lg:grid-cols-3 gap-4" style={{ minHeight: 500 }}>
         {/* List */}
-        <Card className="p-2 lg:col-span-1">
+        <Card className={`${mobileThreadOpen ? 'hidden lg:block' : ''} p-2 lg:col-span-1`}>
           {conversations.length === 0 ? <EmptyState icon={<MessageSquare className="w-5 h-5" />} title="No conversations" description="Start a conversation from a profile or space." /> : (
             <div className="space-y-0.5">
               {conversations.map((c) => {
@@ -31,7 +32,7 @@ export function MessagesPage() {
                 const others = c.participantIds.filter((id) => id !== currentUserId).map((id) => profiles.find((profile) => profile.id === id)).filter(Boolean);
                 const isSpace = c.type === 'space';
                 return (
-                  <button key={c.id} onClick={() => setActiveId(c.id)} className={`w-full text-left p-2.5 rounded-lg flex items-center gap-2.5 ${activeId === c.id ? 'bg-brand-50' : 'hover:bg-ink-50'}`}>
+                  <button key={c.id} onClick={() => { setActiveId(c.id); setMobileThreadOpen(true); }} className={`min-h-11 w-full text-left p-2.5 rounded-lg flex items-center gap-2.5 ${activeId === c.id ? 'bg-brand-50' : 'hover:bg-ink-50'}`}>
                     {isSpace ? <div className="w-9 h-9 rounded-full bg-brand-100 text-brand-600 flex items-center justify-center"><Users className="w-4 h-4" /></div> : others[0] && <Avatar src={others[0].photoUrl} name={others[0].name} size={36} />}
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium text-ink-900 truncate">{c.title}</p>
@@ -45,12 +46,15 @@ export function MessagesPage() {
         </Card>
 
         {/* Thread + context */}
-        <Card className="lg:col-span-2 flex flex-col" style={{ minHeight: 450 }}>
+        <Card className={`${mobileThreadOpen ? 'flex' : 'hidden lg:flex'} lg:col-span-2 flex-col`} style={{ minHeight: 450 }}>
           {!active ? (
             <EmptyState icon={<MessageSquare className="w-5 h-5" />} title="Select a conversation" description="Choose a conversation from the list." />
           ) : (
             <>
               <div className="px-4 py-3 border-b border-ink-100 flex items-center gap-2">
+                <button aria-label="Back to conversations" onClick={() => setMobileThreadOpen(false)} className="lg:hidden min-w-11 min-h-11 -ml-3 flex items-center justify-center text-ink-600">
+                  <ArrowLeft className="w-4 h-4" />
+                </button>
                 {active.type === 'space' && <button onClick={() => active.spaceId && navigate({ name: 'space', spaceId: active.spaceId })} className="text-xs text-brand-600 hover:underline">Open Space</button>}
                 <span className="text-sm font-medium text-ink-900">{active.title}</span>
                 {activeSpace && <Badge tone="brand">{activeSpace.tasks.length} tasks</Badge>}
@@ -85,7 +89,7 @@ export function MessagesPage() {
 
               <div className="p-3 border-t border-ink-100 flex gap-2">
                 <input className="input flex-1" placeholder="Type a message..." value={text} disabled={sending} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && text.trim() && !sending) void submitMessage(active.id, text, sendMessage, setText, setSending, setSendError); }} />
-                <button disabled={sending || !text.trim()} onClick={() => void submitMessage(active.id, text, sendMessage, setText, setSending, setSendError)} className="btn-primary disabled:opacity-50"><Send className="w-4 h-4" /></button>
+                <button aria-label="Send message" disabled={sending || !text.trim()} onClick={() => void submitMessage(active.id, text, sendMessage, setText, setSending, setSendError)} className="btn-primary disabled:opacity-50"><Send className="w-4 h-4" /></button>
               </div>
               {sendError && <p role="alert" className="px-3 pb-3 text-sm text-red-600">{sendError}</p>}
             </>
@@ -165,4 +169,3 @@ function ActionItemsBar({ space, currentUserId }: { space: import('@/types').Col
     </div>
   );
 }
-

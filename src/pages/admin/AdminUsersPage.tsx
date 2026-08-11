@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Search, ShieldAlert, ShieldCheck, RotateCcw, FileText, Users as UsersIcon } from 'lucide-react';
 import { AdminPageHeader } from '@/components/AdminShell';
 import { Card, Badge, Avatar, Modal, EmptyState } from '@/components/ui';
@@ -19,11 +19,7 @@ export function AdminUsersPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadUsers();
-  }, []);
-
-  async function loadUsers() {
+  const loadUsers = useCallback(async () => {
     setLoading(true);
     try {
       const data = await fetchAdminUsers(search);
@@ -33,7 +29,11 @@ export function AdminUsersPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [search]);
+
+  useEffect(() => {
+    loadUsers();
+  }, [loadUsers]);
 
   async function openDetail(user: AdminUserRow) {
     setSelectedUser(user);

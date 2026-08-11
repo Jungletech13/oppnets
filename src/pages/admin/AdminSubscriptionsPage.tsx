@@ -294,7 +294,9 @@ function EntitlementsTab({ entitlements, plans, onError }: { entitlements: Entit
     if (!editing) return;
     setSaving(true);
     try {
-      const { id, plan_id, ...updates } = form;
+      const updates: Partial<PlanEntitlements> = { ...form };
+      delete updates.id;
+      delete updates.plan_id;
       await adminUpdateEntitlements(editing.id, updates);
       setSaved(true);
       setTimeout(() => { setEditing(null); setSaved(false); }, 1000);
