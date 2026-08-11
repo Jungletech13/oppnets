@@ -46,7 +46,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (isE2EMode) return;
 
-    // One-release cleanup for refresh tokens written by the retired Bolt-era
+    // One-release cleanup for refresh tokens written by the retired legacy
     // auth wrapper. Supabase now owns the single persisted session.
     document.cookie = 'oppnets_refresh_token=; Path=/; Secure; SameSite=Lax; Max-Age=0';
 
