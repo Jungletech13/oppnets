@@ -66,8 +66,8 @@ Complete these items only after the independent production deployment works end 
 - [x] Remove legacy-hosted metadata and images.
 - [x] Rename the generic starter package to `oppnets`.
 - [x] Add independent environment and deployment instructions.
-- [ ] Deploy the GitHub repository through Cloudflare Pages.
-- [ ] Verify `oppnets.com` and `www.oppnets.com` on the independent deployment.
+- [x] Deploy the GitHub repository through Cloudflare Pages.
+- [x] Verify `oppnets.com` and `www.oppnets.com` on the independent deployment.
 - [ ] Verify signup, login, password reset, database reads/writes, and realtime.
 - [ ] Commit and deploy every required Supabase Edge Function.
 - [ ] Configure and verify Resend secrets and welcome-email delivery.
@@ -78,4 +78,4 @@ Complete these items only after the independent production deployment works end 
 
 The ownership transfer or claim of a builder-managed Supabase project may be one-way. Verify direct Supabase access, backups, environment values, and function code before confirming that transfer in any dashboard.
 
-The final archive verification and security findings remain in the dated handoff records in this directory.
+The final archive verification and security findings are retained outside the deployable repository.
