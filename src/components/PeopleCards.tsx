@@ -2,7 +2,6 @@ import { CollaborationGroup, Profile } from '@/types';
 import { Badge, Card, Avatar, TrustIndicators } from './ui';
 import { Users, Award, Briefcase, Calendar } from 'lucide-react';
 import { useApp } from '@/store';
-import { getProfile } from '@/data';
 
 const kindLabel: Record<string, string> = {
   individual: 'Individual',
@@ -12,8 +11,8 @@ const kindLabel: Record<string, string> = {
 };
 
 export function GroupCard({ group }: { group: CollaborationGroup }) {
-  const { navigate } = useApp();
-  const members = group.memberIds.map((id) => getProfile(id)).filter(Boolean) as Profile[];
+  const { navigate, profiles } = useApp();
+  const members = group.memberIds.map((id) => profiles.find((profile) => profile.id === id)).filter(Boolean) as Profile[];
 
   return (
     <Card hover onClick={() => navigate({ name: 'profile', profileId: members[0].id })} className="p-5 flex flex-col gap-3">

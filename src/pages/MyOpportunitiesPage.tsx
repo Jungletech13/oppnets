@@ -1,9 +1,8 @@
 import { useApp } from '@/store';
 import { PageHeader } from '@/components/AppShell';
 import { OpportunityCard } from '@/components/OpportunityCard';
-import { Card, SectionHeader, EmptyState, Badge, Avatar, ProgressBar } from '@/components/ui';
+import { Card, SectionHeader, EmptyState, Avatar, ProgressBar } from '@/components/ui';
 import { Briefcase, LayoutDashboard, Plus, ArrowRight, Users } from 'lucide-react';
-import { getProfile } from '@/data';
 import { useEffect, useState } from 'react';
 import { decideOpportunityApplication, fetchApplications } from '@/lib/queries';
 
@@ -114,7 +113,7 @@ export function MyOpportunitiesPage() {
                   <ProgressBar value={pct} showLabel />
                   <div className="flex items-center justify-between mt-3">
                     <div className="flex -space-x-1.5">
-                      {s.memberIds.slice(0, 4).map((id) => { const p = getProfile(id); return p ? <Avatar key={id} src={p.photoUrl} name={p.name} size={22} /> : null; })}
+                      {s.memberIds.slice(0, 4).map((id) => { const p = profiles.find((profile) => profile.id === id); return p ? <Avatar key={id} src={p.photoUrl} name={p.name} size={22} /> : null; })}
                     </div>
                     <span className="text-xs text-brand-600 font-medium inline-flex items-center">Open <ArrowRight className="w-3 h-3" /></span>
                   </div>

@@ -6,13 +6,11 @@ import { Search, MapPin, ShieldCheck, Building2, Plus, Bookmark, BookmarkCheck, 
 import { COMPANIES as DEMO_COMPANIES } from '@/data-phase2';
 import { fetchCompanies, createCompany, fetchSavedListings, toggleSavedListing } from '@/lib/queries';
 import { useAuth } from '@/lib/auth';
-import type { Company, CompanySize, Industry } from '@/types';
+import { mapCompanyRow } from '@/lib/domain-mappers';
+import { isE2EMode } from '@/lib/runtime';
+import type { Company, CompanySize } from '@/types';
 
 const SIZES: (CompanySize | 'All')[] = ['All', '1-10', '11-50', '51-200', '201-500', '500+'];
-
-interface DbCompany extends Company {
-  company_reviews?: Company['reviews'];
-}
 
 export function CompaniesPage() {
   const { navigate } = useApp();
@@ -20,7 +18,7 @@ export function CompaniesPage() {
   const [search, setSearch] = useState('');
   const [size, setSize] = useState<CompanySize | 'All'>('All');
   const [verifiedOnly, setVerifiedOnly] = useState(false);
-  const [dbCompanies, setDbCompanies] = useState<DbCompany[]>([]);
+  const [dbCompanies, setDbCompanies] = useState<Company[]>(isE2EMode ? DEMO_COMPANIES : []);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
@@ -29,34 +27,21 @@ export function CompaniesPage() {
   const loadCompanies = useCallback(async () => {
     setLoading(true);
     setError(null);
+    if (isE2EMode) {
+      setDbCompanies(DEMO_COMPANIES);
+      setLoading(false);
+      return;
+    }
     try {
       const data = await fetchCompanies();
-      const mapped: DbCompany[] = (data || []).map((r: Record<string, unknown>) => ({
-        id: r.id as string,
-        name: r.name as string,
-        logoUrl: (r.logo_url as string) || '',
-        description: (r.description as string) || '',
-        mission: (r.mission as string) || '',
-        services: (r.services as string[]) || [],
-        industries: (r.industries as Industry[]) || [],
-        size: (r.size as CompanySize) || '1-10',
-        location: (r.location as string) || '',
-        website: (r.website as string) || '',
-        contactInfo: (r.contact_info as string) || '',
-        teamMemberIds: (r.team_member_ids as string[]) || [],
-        opportunityIds: (r.opportunity_ids as string[]) || [],
-        portfolio: (r.portfolio as Company['portfolio']) || [],
-        reviews: (r.company_reviews as Company['reviews']) || [],
-        verified: (r.verified as boolean) ?? false,
-        ownerId: (r.owner_id as string) || '',
-      }));
+      const mapped = (data || []).map((row) => mapCompanyRow(row as Record<string, unknown>));
       setDbCompanies(mapped);
       if (session) {
         const saved = await fetchSavedListings();
         setSavedIds(new Set((saved ?? []).filter((row) => row.listing_type === 'company').map((row) => row.listing_id)));
       }
     } catch {
-      setError('Could not load companies. Showing demo data instead.');
+      setError('Could not load companies. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -66,7 +51,7 @@ export function CompaniesPage() {
     loadCompanies();
   }, [loadCompanies]);
 
-  const allCompanies = [...dbCompanies, ...DEMO_COMPANIES.filter((dc) => !dbCompanies.some((db) => db.id === dc.id))];
+  const allCompanies = dbCompanies;
 
   const filtered = allCompanies.filter((c) => {
     if (size !== 'All' && c.size !== size) return false;

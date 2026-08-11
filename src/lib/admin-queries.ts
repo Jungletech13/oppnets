@@ -107,8 +107,9 @@ export interface PlatformStats {
 }
 
 export async function fetchPlatformStats(): Promise<PlatformStats> {
-  const [profiles, spaces, profs, cos, apps, msgs, verifications, reports] = await Promise.all([
+  const [profiles, opportunities, spaces, profs, cos, apps, msgs, verifications, reports] = await Promise.all([
     supabase.from('profiles').select('id, created_at', { count: 'exact', head: false }),
+    supabase.from('opportunities').select('id', { count: 'exact', head: true }),
     supabase.from('collaboration_spaces').select('id', { count: 'exact', head: true }),
     supabase.from('professionals').select('id', { count: 'exact', head: true }),
     supabase.from('companies').select('id', { count: 'exact', head: true }),
@@ -127,7 +128,7 @@ export async function fetchPlatformStats(): Promise<PlatformStats> {
   return {
     totalUsers: profiles.count ?? 0,
     activeUsers: activeCount,
-    opportunities: 0,
+    opportunities: opportunities.count ?? 0,
     collaborationSpaces: spaces.count ?? 0,
     professionals: profs.count ?? 0,
     companies: cos.count ?? 0,

@@ -6,11 +6,9 @@ import { MapPin, Star, ShieldCheck, Globe, Clock, DollarSign, Mail, CheckCircle2
 import { getProfessional } from '@/data-phase2';
 import { fetchProfessional, sendInquiry, toggleSavedListing, isListingSaved } from '@/lib/queries';
 import { useAuth } from '@/lib/auth';
-import type { Industry, Professional, ProfessionalCategory } from '@/types';
-
-interface DbProfessional extends Professional {
-  professional_reviews?: Professional['reviews'];
-}
+import { mapProfessionalRow } from '@/lib/domain-mappers';
+import { isE2EMode } from '@/lib/runtime';
+import type { Professional } from '@/types';
 
 export function ProfessionalDetailPage({ professionalId }: { professionalId: string }) {
   const { navigate } = useApp();
@@ -20,51 +18,29 @@ export function ProfessionalDetailPage({ professionalId }: { professionalId: str
   const [showInquiry, setShowInquiry] = useState(false);
   const [saved, setSaved] = useState(false);
   const [inquirySent, setInquirySent] = useState(false);
-  const [isDemo, setIsDemo] = useState(false);
+  const [isDemo, setIsDemo] = useState(isE2EMode);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const loadProfessional = useCallback(async () => {
     setLoading(true);
-    const demo = getProfessional(professionalId);
+    setLoadError(null);
+    if (isE2EMode) {
+      setPro(getProfessional(professionalId) ?? null);
+      setIsDemo(true);
+      setLoading(false);
+      return;
+    }
     try {
       const data = await fetchProfessional(professionalId);
-      if (data) {
-        const r = data as Record<string, unknown>;
-        const mapped: DbProfessional = {
-          id: r.id as string,
-          businessName: r.business_name as string,
-          logoUrl: (r.logo_url as string) || '',
-          category: r.category as ProfessionalCategory,
-          description: (r.description as string) || '',
-          services: (r.services as string[]) || [],
-          industriesServed: (r.industries_served as Industry[]) || [],
-          location: (r.location as string) || '',
-          remote: (r.remote as boolean) ?? true,
-          portfolio: (r.portfolio as Professional['portfolio']) || [],
-          certifications: (r.certifications as string[]) || [],
-          website: (r.website as string) || '',
-          yearsInBusiness: (r.years_in_business as number) || 1,
-          contactMethods: (r.contact_methods as string[]) || [],
-          responseTime: (r.response_time as string) || 'Within 24 hours',
-          pricingModel: (r.pricing_model as Professional['pricingModel']) || 'Contact for quote',
-          availability: (r.availability as Professional['availability']) || 'Available',
-          reviews: (r.professional_reviews as Professional['reviews']) || [],
-          verified: (r.verified as boolean) ?? false,
-          premium: (r.premium as boolean) ?? false,
-          sponsored: (r.sponsored as boolean) ?? false,
-          ownerId: (r.owner_id as string) || '',
-        };
-        setPro(mapped);
-        setIsDemo(false);
-      } else {
-        setPro(demo ?? null);
-        setIsDemo(!!demo);
-      }
+      setPro(data ? mapProfessionalRow(data as Record<string, unknown>) : null);
+      setIsDemo(false);
       if (session) {
         setSaved(await isListingSaved('professional', professionalId));
       }
     } catch {
-      setPro(demo ?? null);
-      setIsDemo(!!demo);
+      setPro(null);
+      setIsDemo(false);
+      setLoadError('Could not load this professional. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -94,7 +70,7 @@ export function ProfessionalDetailPage({ professionalId }: { professionalId: str
     return (
       <div>
         <PageHeader title="Professional not found" />
-        <EmptyState icon={<Briefcase className="w-5 h-5" />} title="Not found" description="This professional profile does not exist." />
+        <EmptyState icon={<Briefcase className="w-5 h-5" />} title={loadError ? 'Could not load profile' : 'Not found'} description={loadError ?? 'This professional profile does not exist.'} />
       </div>
     );
   }

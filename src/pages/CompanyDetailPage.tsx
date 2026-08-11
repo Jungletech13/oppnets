@@ -5,60 +5,40 @@ import { Card, Badge, Avatar, EmptyState } from '@/components/ui';
 import { MapPin, Star, ShieldCheck, Globe, Mail, ArrowLeft, Building2, Briefcase, Target, Bookmark, BookmarkCheck } from 'lucide-react';
 import { getCompany } from '@/data-phase2';
 import { fetchCompany, toggleSavedListing, isListingSaved } from '@/lib/queries';
-import { getProfile } from '@/data';
 import { useAuth } from '@/lib/auth';
-import type { Company, CompanySize, Industry } from '@/types';
-
-interface DbCompany extends Company {
-  company_reviews?: Company['reviews'];
-}
+import { mapCompanyRow } from '@/lib/domain-mappers';
+import { isE2EMode } from '@/lib/runtime';
+import type { Company } from '@/types';
 
 export function CompanyDetailPage({ companyId }: { companyId: string }) {
-  const { navigate, opportunities } = useApp();
+  const { navigate, opportunities, profiles } = useApp();
   const { session } = useAuth();
   const [company, setCompany] = useState<Company | null>(null);
   const [loading, setLoading] = useState(true);
   const [saved, setSaved] = useState(false);
-  const [isDemo, setIsDemo] = useState(false);
+  const [isDemo, setIsDemo] = useState(isE2EMode);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const loadCompany = useCallback(async () => {
     setLoading(true);
-    const demo = getCompany(companyId);
+    setLoadError(null);
+    if (isE2EMode) {
+      setCompany(getCompany(companyId) ?? null);
+      setIsDemo(true);
+      setLoading(false);
+      return;
+    }
     try {
       const data = await fetchCompany(companyId);
-      if (data) {
-        const r = data as Record<string, unknown>;
-        const mapped: DbCompany = {
-          id: r.id as string,
-          name: r.name as string,
-          logoUrl: (r.logo_url as string) || '',
-          description: (r.description as string) || '',
-          mission: (r.mission as string) || '',
-          services: (r.services as string[]) || [],
-          industries: (r.industries as Industry[]) || [],
-          size: (r.size as CompanySize) || '1-10',
-          location: (r.location as string) || '',
-          website: (r.website as string) || '',
-          contactInfo: (r.contact_info as string) || '',
-          teamMemberIds: (r.team_member_ids as string[]) || [],
-          opportunityIds: (r.opportunity_ids as string[]) || [],
-          portfolio: (r.portfolio as Company['portfolio']) || [],
-          reviews: (r.company_reviews as Company['reviews']) || [],
-          verified: (r.verified as boolean) ?? false,
-          ownerId: (r.owner_id as string) || '',
-        };
-        setCompany(mapped);
-        setIsDemo(false);
-      } else {
-        setCompany(demo ?? null);
-        setIsDemo(!!demo);
-      }
+      setCompany(data ? mapCompanyRow(data as Record<string, unknown>) : null);
+      setIsDemo(false);
       if (session) {
         setSaved(await isListingSaved('company', companyId));
       }
     } catch {
-      setCompany(demo ?? null);
-      setIsDemo(!!demo);
+      setCompany(null);
+      setIsDemo(false);
+      setLoadError('Could not load this company. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -88,12 +68,12 @@ export function CompanyDetailPage({ companyId }: { companyId: string }) {
     return (
       <div>
         <PageHeader title="Company not found" />
-        <EmptyState icon={<Building2 className="w-5 h-5" />} title="Not found" description="This company page does not exist." />
+        <EmptyState icon={<Building2 className="w-5 h-5" />} title={loadError ? 'Could not load company' : 'Not found'} description={loadError ?? 'This company page does not exist.'} />
       </div>
     );
   }
 
-  const team = company.teamMemberIds.map((id) => getProfile(id)).filter(Boolean);
+  const team = company.teamMemberIds.map((id) => profiles.find((profile) => profile.id === id)).filter(Boolean);
   const companyOpps = opportunities.filter((o) => company.opportunityIds.includes(o.id));
   const avgRating = company.reviews.length > 0 ? company.reviews.reduce((sum, r) => sum + r.rating, 0) / company.reviews.length : 0;
 

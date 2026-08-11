@@ -1,13 +1,13 @@
 import { useState } from 'react';
-import { useApp, taskProgress, MODULE_CATALOG, MODULE_PRESETS } from '@/store';
+import { useApp } from '@/store';
+import { taskProgress, MODULE_CATALOG, MODULE_PRESETS } from '@/lib/workspace-config';
 import { PageHeader } from '@/components/AppShell';
 import { Card, Badge, Avatar, ProgressBar, StatusPill, SectionHeader, Modal, Field, EmptyState, BetaNote } from '@/components/ui';
 import {
   CheckCircle2, Circle, AlertTriangle, Clock, Plus, X, ListChecks, MessageSquare, Calendar, Milestone as MilestoneIcon,
   FileText, StickyNote, Users, Settings, Gavel, ClipboardList, ChevronRight, ArrowLeft, ShieldCheck, GripVertical, Eye, EyeOff, Pin, PinOff, LayoutTemplate, Target, Flag,
 } from 'lucide-react';
-import { getProfile } from '@/data';
-import type { CollaborationSpace, Task, ModuleKind, WorkspaceModule, CheckInFrequency } from '@/types';
+import type { CollaborationSpace, Task, ModuleKind, WorkspaceModule, CheckInFrequency, Profile } from '@/types';
 
 type Tab = 'dashboard' | 'tasks' | 'chat' | 'milestones' | 'decisions' | 'record' | 'notes' | 'files' | 'settings' | 'toolkit';
 
@@ -18,8 +18,14 @@ const MODULE_ICONS: Record<string, typeof ListChecks> = {
   investors: Users, hiring: Users, project_timeline: Calendar, decision_log: Gavel, collaboration_record: ClipboardList,
 };
 
+function useProfileLookup() {
+  const { profiles } = useApp();
+  return (profileId: string): Profile | undefined => profiles.find((profile) => profile.id === profileId);
+}
+
 export function SpacePage({ spaceId }: { spaceId: string }) {
   const { spaces, navigate } = useApp();
+  const getProfile = useProfileLookup();
   const space = spaces.find((s) => s.id === spaceId);
   const [tab, setTab] = useState<Tab>('dashboard');
 
@@ -133,6 +139,7 @@ function ModuleLink({ label, icon: Icon, active, onClick, pinned }: { label: str
 // ===== Dashboard =====
 function DashboardTab({ space, overallProgress, setTab }: { space: CollaborationSpace; overallProgress: number; setTab: (t: Tab) => void }) {
   const { currentUserId } = useApp();
+  const getProfile = useProfileLookup();
   const myTasks = space.tasks.filter((t) => t.ownerId === currentUserId || t.reviewerId === currentUserId);
   const blocked = space.tasks.filter((t) => t.status === 'Blocked');
   const overdue = space.tasks.filter((t) => new Date(t.dueDate) < new Date() && t.status !== 'Completed' && t.status !== 'Approved');
@@ -285,6 +292,7 @@ function TaskGroup({ label, tasks, onSelect }: { label: string; tasks: Task[]; o
 }
 
 function TaskRow({ task, onClick, compact }: { task: Task; onClick?: () => void; compact?: boolean }) {
+  const getProfile = useProfileLookup();
   const { done, total, approvedPct } = taskProgress(task);
   const owner = getProfile(task.ownerId);
   const overdue = new Date(task.dueDate) < new Date() && task.status !== 'Completed' && task.status !== 'Approved';
@@ -320,6 +328,7 @@ function TaskDetail({ task, space, onBack }: { task: Task; space: CollaborationS
   const [comment, setComment] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const getProfile = useProfileLookup();
 
   const runTaskAction = async (action: () => Promise<void>) => {
     setIsSaving(true);
@@ -514,6 +523,7 @@ function FeedbackForm({ onSubmit, onCancel }: { onSubmit: (fb: { reviewerId: str
 }
 
 function NewTaskModal({ open, onClose, space, onCreate }: { open: boolean; onClose: () => void; space: CollaborationSpace; onCreate: (t: Task) => Promise<void> }) {
+  const getProfile = useProfileLookup();
   const { currentUserId } = useApp();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -582,9 +592,27 @@ function NewTaskModal({ open, onClose, space, onCreate }: { open: boolean; onClo
 // ===== Chat =====
 function ChatTab({ space }: { space: CollaborationSpace }) {
   const { conversations, sendMessage, startConversation, currentUserId } = useApp();
+  const getProfile = useProfileLookup();
   const conv = conversations.find((c) => c.spaceId === space.id);
   const [text, setText] = useState('');
-  const convId = conv?.id ?? '';
+  const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
+
+  const submitMessage = async () => {
+    const message = text.trim();
+    if (!message || sending) return;
+    setSending(true);
+    setSendError(null);
+    try {
+      if (conv) await sendMessage(conv.id, message);
+      else await startConversation(space.memberIds, `${space.name} — Team`, 'space', space.id, message);
+      setText('');
+    } catch (error) {
+      setSendError(error instanceof Error ? error.message : 'Could not send the message.');
+    } finally {
+      setSending(false);
+    }
+  };
 
   return (
     <div className="space-y-3">
@@ -606,9 +634,10 @@ function ChatTab({ space }: { space: CollaborationSpace }) {
             );
           })}
         </div>
+        {sendError && <p role="alert" className="text-sm text-red-600 mb-2">{sendError}</p>}
         <div className="flex gap-2">
-          <input className="input flex-1" placeholder="Type a message..." value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && text) { if (!conv) { startConversation(space.memberIds, `${space.name} — Team`, 'space', space.id); } sendMessage(convId, text); setText(''); } }} />
-          <button onClick={() => { if (text) { if (!conv) { startConversation(space.memberIds, `${space.name} — Team`, 'space', space.id); } sendMessage(convId, text); setText(''); } }} className="btn-primary">Send</button>
+          <input className="input flex-1" placeholder="Type a message..." value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') void submitMessage(); }} />
+          <button onClick={() => void submitMessage()} disabled={sending || !text.trim()} className="btn-primary">{sending ? 'Sending...' : 'Send'}</button>
         </div>
       </Card>
     </div>
@@ -621,6 +650,24 @@ function MilestonesTab({ space }: { space: CollaborationSpace }) {
   const [showNew, setShowNew] = useState(false);
   const [title, setTitle] = useState('');
   const [dueDate, setDueDate] = useState('');
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const create = async () => {
+    if (!title.trim()) return;
+    setSaving(true);
+    setSaveError(null);
+    try {
+      await addMilestone(space.id, { id: `m-${Date.now()}`, title: title.trim(), dueDate: dueDate || new Date().toISOString().slice(0, 10), done: false });
+      setShowNew(false);
+      setTitle('');
+      setDueDate('');
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : 'Could not save the milestone.');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const done = space.milestones.filter((m) => m.done).length;
   return (
@@ -633,7 +680,7 @@ function MilestonesTab({ space }: { space: CollaborationSpace }) {
         <div className="space-y-2">
           {space.milestones.map((m) => (
             <Card key={m.id} className="p-3 flex items-center gap-3">
-              <button onClick={() => toggleMilestone(space.id, m.id)}>{m.done ? <CheckCircle2 className="w-5 h-5 text-accent-500" /> : <Circle className="w-5 h-5 text-ink-300" />}</button>
+              <button onClick={() => void toggleMilestone(space.id, m.id).catch((error) => setSaveError(error instanceof Error ? error.message : 'Could not update the milestone.'))}>{m.done ? <CheckCircle2 className="w-5 h-5 text-accent-500" /> : <Circle className="w-5 h-5 text-ink-300" />}</button>
               <div className="flex-1">
                 <p className={`text-sm font-medium ${m.done ? 'text-ink-400 line-through' : 'text-ink-900'}`}>{m.title}</p>
                 <p className="text-xs text-ink-500">Due {m.dueDate}</p>
@@ -643,11 +690,12 @@ function MilestonesTab({ space }: { space: CollaborationSpace }) {
           ))}
         </div>
       )}
+      {saveError && <p role="alert" className="text-sm text-red-600">{saveError}</p>}
       <Modal open={showNew} onClose={() => setShowNew(false)} title="Add milestone">
         <div className="space-y-3">
           <Field label="Title"><input className="input" value={title} onChange={(e) => setTitle(e.target.value)} /></Field>
           <Field label="Due date"><input type="date" className="input" value={dueDate} onChange={(e) => setDueDate(e.target.value)} /></Field>
-          <div className="flex justify-end gap-2"><button onClick={() => setShowNew(false)} className="btn-secondary">Cancel</button><button onClick={() => { if (title) { addMilestone(space.id, { id: `m-${Date.now()}`, title, dueDate: dueDate || new Date().toISOString().slice(0, 10), done: false }); setShowNew(false); setTitle(''); } }} className="btn-primary">Add</button></div>
+          <div className="flex justify-end gap-2"><button onClick={() => setShowNew(false)} className="btn-secondary">Cancel</button><button onClick={() => void create()} disabled={saving || !title.trim()} className="btn-primary">{saving ? 'Saving...' : 'Add'}</button></div>
         </div>
       </Modal>
     </div>
@@ -657,9 +705,28 @@ function MilestonesTab({ space }: { space: CollaborationSpace }) {
 // ===== Decisions =====
 function DecisionsTab({ space }: { space: CollaborationSpace }) {
   const { addDecision, currentUserId } = useApp();
+  const getProfile = useProfileLookup();
   const [showNew, setShowNew] = useState(false);
   const [title, setTitle] = useState('');
   const [rationale, setRationale] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const create = async () => {
+    if (!title.trim()) return;
+    setSaving(true);
+    setSaveError(null);
+    try {
+      await addDecision(space.id, { id: `d-${Date.now()}`, title: title.trim(), rationale: rationale.trim(), decidedAt: new Date().toISOString().slice(0, 10), by: currentUserId });
+      setShowNew(false);
+      setTitle('');
+      setRationale('');
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : 'Could not save the decision.');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -684,11 +751,12 @@ function DecisionsTab({ space }: { space: CollaborationSpace }) {
           })}
         </div>
       )}
+      {saveError && <p role="alert" className="text-sm text-red-600">{saveError}</p>}
       <Modal open={showNew} onClose={() => setShowNew(false)} title="Log a decision">
         <div className="space-y-3">
           <Field label="Decision"><input className="input" value={title} onChange={(e) => setTitle(e.target.value)} /></Field>
           <Field label="Rationale"><textarea className="input min-h-[60px]" value={rationale} onChange={(e) => setRationale(e.target.value)} /></Field>
-          <div className="flex justify-end gap-2"><button onClick={() => setShowNew(false)} className="btn-secondary">Cancel</button><button onClick={() => { if (title) { addDecision(space.id, { id: `d-${Date.now()}`, title, rationale, decidedAt: new Date().toISOString().slice(0, 10), by: currentUserId }); setShowNew(false); setTitle(''); setRationale(''); } }} className="btn-primary">Log</button></div>
+          <div className="flex justify-end gap-2"><button onClick={() => setShowNew(false)} className="btn-secondary">Cancel</button><button onClick={() => void create()} disabled={saving || !title.trim()} className="btn-primary">{saving ? 'Saving...' : 'Log'}</button></div>
         </div>
       </Modal>
     </div>
@@ -698,7 +766,10 @@ function DecisionsTab({ space }: { space: CollaborationSpace }) {
 // ===== Collaboration Record =====
 function RecordTab({ space }: { space: CollaborationSpace }) {
   const { acknowledgeRecord, currentUserId } = useApp();
+  const getProfile = useProfileLookup();
   const [print, setPrint] = useState(false);
+  const [acknowledging, setAcknowledging] = useState(false);
+  const [acknowledgmentError, setAcknowledgmentError] = useState<string | null>(null);
   const r = space.record;
   const me = currentUserId;
   const acknowledged = r.acknowledgments.includes(me);
@@ -753,8 +824,9 @@ function RecordTab({ space }: { space: CollaborationSpace }) {
             return p ? <div key={id} className="flex items-center gap-2 text-sm"><CheckCircle2 className="w-4 h-4 text-accent-500" /> {p.name}</div> : null;
           })}
         </div>
-        <button onClick={() => acknowledgeRecord(space.id, me)} disabled={acknowledged} className={acknowledged ? 'btn-secondary' : 'btn-primary'}>
-          {acknowledged ? 'Acknowledged' : 'Acknowledge record'}
+        {acknowledgmentError && <p role="alert" className="text-sm text-red-600 mb-2">{acknowledgmentError}</p>}
+        <button onClick={() => { setAcknowledging(true); setAcknowledgmentError(null); void acknowledgeRecord(space.id).catch((error) => setAcknowledgmentError(error instanceof Error ? error.message : 'Could not save acknowledgment.')).finally(() => setAcknowledging(false)); }} disabled={acknowledged || acknowledging} className={acknowledged ? 'btn-secondary' : 'btn-primary'}>
+          {acknowledged ? 'Acknowledged' : acknowledging ? 'Saving...' : 'Acknowledge record'}
         </button>
       </Card>
 
@@ -782,10 +854,23 @@ function RecordRow({ label, value }: { label: string; value: string }) {
 // ===== Notes =====
 function NotesTab({ space }: { space: CollaborationSpace }) {
   const { updateSpace } = useApp();
+  const [notes, setNotes] = useState(space.notes);
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const save = async () => {
+    if (notes === space.notes) return;
+    setSaveState('saving');
+    try {
+      await updateSpace(space.id, (current) => ({ ...current, notes }));
+      setSaveState('saved');
+    } catch {
+      setSaveState('error');
+    }
+  };
   return (
     <div className="space-y-3">
       <SectionHeader title="Notes" subtitle="Shared notes for the team." />
-      <textarea className="input min-h-[200px]" defaultValue={space.notes} onChange={(e) => updateSpace(space.id, (s) => ({ ...s, notes: e.target.value }))} placeholder="Write shared notes here..." />
+      <textarea className="input min-h-[200px]" value={notes} onChange={(e) => { setNotes(e.target.value); setSaveState('idle'); }} onBlur={() => void save()} placeholder="Write shared notes here..." />
+      <p className={`text-xs ${saveState === 'error' ? 'text-red-600' : 'text-ink-500'}`}>{saveState === 'saving' ? 'Saving...' : saveState === 'saved' ? 'Saved' : saveState === 'error' ? 'Could not save notes. Try again.' : 'Changes save when you leave this field.'}</p>
     </div>
   );
 }
@@ -814,6 +899,7 @@ function FilesTab({ space }: { space: CollaborationSpace }) {
 function SettingsTab({ space }: { space: CollaborationSpace }) {
   const { updateModules } = useApp();
   const [modules, setModules] = useState<WorkspaceModule[]>(space.modules);
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
 
   const toggleVisible = (kind: ModuleKind) => setModules((prev) => prev.map((m) => (m.kind === kind ? { ...m, visible: !m.visible } : m)));
   const togglePinned = (kind: ModuleKind) => setModules((prev) => prev.map((m) => (m.kind === kind ? { ...m, pinned: !m.pinned } : m)));
@@ -834,7 +920,15 @@ function SettingsTab({ space }: { space: CollaborationSpace }) {
     }).filter((m) => m.visible);
     setModules(newModules);
   };
-  const save = () => updateModules(space.id, modules);
+  const save = async () => {
+    setSaveState('saving');
+    try {
+      await updateModules(space.id, modules);
+      setSaveState('saved');
+    } catch {
+      setSaveState('error');
+    }
+  };
 
   return (
     <div className="space-y-5">
@@ -866,8 +960,8 @@ function SettingsTab({ space }: { space: CollaborationSpace }) {
           ))}
         </div>
         <div className="flex items-center gap-3 mt-3">
-          <button onClick={save} className="btn-primary">Save layout</button>
-          <span className="text-xs text-ink-500">Changes apply to the sidebar after saving.</span>
+          <button onClick={() => void save()} disabled={saveState === 'saving'} className="btn-primary">{saveState === 'saving' ? 'Saving...' : 'Save layout'}</button>
+          <span className={`text-xs ${saveState === 'error' ? 'text-red-600' : 'text-ink-500'}`}>{saveState === 'saved' ? 'Layout saved.' : saveState === 'error' ? 'Could not save layout.' : 'Changes apply to the sidebar after saving.'}</span>
         </div>
       </Card>
 
@@ -880,14 +974,31 @@ function SettingsTab({ space }: { space: CollaborationSpace }) {
 function CheckInSettings({ space }: { space: CollaborationSpace }) {
   const { setCheckInFrequency } = useApp();
   const [freq, setFreq] = useState<CheckInFrequency>(space.checkInFrequency);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const chooseFrequency = async (frequency: CheckInFrequency) => {
+    const previous = freq;
+    setFreq(frequency);
+    setSaving(true);
+    setError(null);
+    try {
+      await setCheckInFrequency(space.id, frequency);
+    } catch (saveError) {
+      setFreq(previous);
+      setError(saveError instanceof Error ? saveError.message : 'Could not save check-in frequency.');
+    } finally {
+      setSaving(false);
+    }
+  };
   return (
     <Card className="p-4">
       <h3 className="text-sm font-semibold text-ink-800 mb-2">Partnership check-in frequency</h3>
       <div className="flex flex-wrap gap-2">
         {(['Weekly', 'Monthly', 'Quarterly', 'Custom'] as CheckInFrequency[]).map((f) => (
-          <button key={f} onClick={() => { setFreq(f); setCheckInFrequency(space.id, f); }} className={`btn px-4 py-2 text-sm ${freq === f ? 'bg-brand-600 text-white' : 'bg-white text-ink-600 border border-ink-200'}`}>{f}</button>
+          <button key={f} disabled={saving} onClick={() => void chooseFrequency(f)} className={`btn px-4 py-2 text-sm ${freq === f ? 'bg-brand-600 text-white' : 'bg-white text-ink-600 border border-ink-200'}`}>{f}</button>
         ))}
       </div>
+      {error && <p role="alert" className="text-sm text-red-600 mt-2">{error}</p>}
     </Card>
   );
 }

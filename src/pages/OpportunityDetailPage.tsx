@@ -2,8 +2,7 @@ import { useApp } from '@/store';
 import { PageHeader } from '@/components/AppShell';
 import { Badge, Card, Avatar, TrustIndicators, VerificationPill, SectionHeader, Modal, BetaNote } from '@/components/ui';
 import { MatchReasons } from '@/components/OpportunityCard';
-import { MapPin, Clock, Users, Calendar, ShieldCheck, Target, User as UserIcon, Layers, Briefcase, Plus } from 'lucide-react';
-import { getProfile } from '@/data';
+import { MapPin, Clock, Users, Calendar, ShieldCheck, Target, Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { OpportunityDNA } from '@/types';
 import { applyToOpportunity, fetchApplications } from '@/lib/queries';
@@ -29,7 +28,7 @@ export function OpportunityDetailPage({ opportunityId }: { opportunityId: string
   if (!opp) {
     return <EmptyState message="Opportunity not found." />;
   }
-  const owner = getProfile(opp.ownerId);
+  const owner = profiles.find((profile) => profile.id === opp.ownerId);
 
   const handleApply = async () => {
     setCreating(true);

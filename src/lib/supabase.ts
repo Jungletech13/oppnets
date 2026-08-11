@@ -9,29 +9,27 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 const projectRef = new URL(supabaseUrl).hostname.split('.')[0];
 const defaultStorageKey = `sb-${projectRef}-auth-token`;
-const legacyStorageKey = 'oppnets-auth-session';
-
 const resilientStorage = {
   getItem(key: string) {
     try {
-      // Prefer the same-tab copy: browsers can leave a readable but stale
-      // localStorage value when writes are restricted by privacy settings.
-      return window.sessionStorage.getItem(key) ?? window.localStorage.getItem(key);
+      const value = window.localStorage.getItem(key);
+      if (value) return value;
     } catch {
-      try {
-        return window.sessionStorage.getItem(key);
-      } catch {
-        return null;
-      }
+      // Fall through to session storage.
+    }
+    try {
+      return window.sessionStorage.getItem(key);
+    } catch {
+      return null;
     }
   },
   setItem(key: string, value: string) {
     try {
       window.localStorage.setItem(key, value);
+      return;
     } catch {
-      // Session storage still preserves authentication across page refreshes.
+      window.sessionStorage.setItem(key, value);
     }
-    window.sessionStorage.setItem(key, value);
   },
   removeItem(key: string) {
     try {
@@ -39,18 +37,13 @@ const resilientStorage = {
     } catch {
       // Continue clearing the session-scoped copy.
     }
-    window.sessionStorage.removeItem(key);
+    try {
+      window.sessionStorage.removeItem(key);
+    } catch {
+      // Storage may be unavailable in strict privacy modes.
+    }
   },
 };
-
-try {
-  const legacySession = window.localStorage.getItem(legacyStorageKey);
-  if (legacySession) resilientStorage.setItem(defaultStorageKey, legacySession);
-  resilientStorage.removeItem(legacyStorageKey);
-} catch {
-  // Supabase will report storage failures through its auth APIs. Avoid making
-  // the entire application unavailable in browsers that restrict storage.
-}
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {

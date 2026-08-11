@@ -7,8 +7,6 @@ import {
   Bell, CheckCircle2, AlertTriangle, CalendarClock, LayoutDashboard,
   ArrowRight, Handshake, Clock, Zap, Calendar, Flag,
 } from 'lucide-react';
-import { getProfile } from '@/data';
-import type { Task } from '@/types';
 
 export function HomePage() {
   const { opportunities, groups, profiles, spaces, currentUserId, navigate, notifications } = useApp();
@@ -219,7 +217,7 @@ export function HomePage() {
                     <ProgressBar value={spaceProgress} showLabel />
                     <div className="flex items-center justify-between mt-2">
                       <div className="flex -space-x-1.5">
-                        {s.memberIds.slice(0, 4).map((id) => { const p = getProfile(id); return p ? <Avatar key={id} src={p.photoUrl} name={p.name} size={22} /> : null; })}
+                        {s.memberIds.slice(0, 4).map((id) => { const p = profiles.find((profile) => profile.id === id); return p ? <Avatar key={id} src={p.photoUrl} name={p.name} size={22} /> : null; })}
                       </div>
                       <span className="text-xs text-ink-500">{s.tasks.length} tasks</span>
                     </div>
@@ -251,7 +249,7 @@ export function HomePage() {
             <SectionHeader title="Recent project activity" subtitle="What has been happening across your spaces." />
             <Card className="divide-y divide-ink-100">
               {recentActivity.map((a) => {
-                const actor = a.actorId ? getProfile(a.actorId) : null;
+                const actor = a.actorId ? profiles.find((profile) => profile.id === a.actorId) : null;
                 return (
                   <div key={a.id} className="flex items-center gap-3 p-3">
                     {actor ? <Avatar src={actor.photoUrl} name={actor.name} size={28} /> : <div className="w-7 h-7 rounded-full bg-ink-100" />}
@@ -310,7 +308,7 @@ function ActionStat({ label, value, tone, icon: Icon }: { label: string; value: 
   );
 }
 
-export function computeSpaceProgress(tasks: Task[]): number {
+function computeSpaceProgress(tasks: import('@/types').Task[]): number {
   if (!tasks.length) return 0;
   const total = tasks.reduce((sum, t) => sum + t.checklist.length, 0);
   if (total === 0) return 0;

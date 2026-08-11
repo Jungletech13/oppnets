@@ -577,24 +577,6 @@ export interface ResourceArticle {
 
 // Phase 2 — Pricing
 
-export type PlanTier = 'builder-free' | 'builder-pro' | 'professional' | 'company';
-
-export interface PlanFeature {
-  label: string;
-  included: boolean;
-}
-
-export interface PricingPlan {
-  tier: PlanTier;
-  name: string;
-  price: string;
-  period: string;
-  description: string;
-  features: PlanFeature[];
-  cta: string;
-  highlighted: boolean;
-}
-
 // Phase 3.2 — Subscription Foundation
 
 export type PlanCategory = 'builder_free' | 'builder_pro' | 'professional' | 'company';
@@ -684,14 +666,6 @@ export interface SubscriptionCostFactor {
   description: string;
   created_at: string;
   updated_at: string;
-}
-
-export interface EntitlementCheckResult {
-  allowed: boolean;
-  reason: string;
-  currentUsage: number;
-  limit: number;
-  upgradeRecommendation?: string;
 }
 
 // Phase 4.1 — Trust Foundation

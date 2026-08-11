@@ -3,7 +3,6 @@ import { useApp } from '@/store';
 import { PageHeader } from '@/components/AppShell';
 import { Card, SectionHeader, Badge, VerificationPill, Modal, Field, BetaNote } from '@/components/ui';
 import { ShieldCheck, ShieldAlert, Shield, AlertTriangle, FileWarning, Scale, Info, Lock, Phone, UserCog, Users, Star, ScanSearch, XCircle, CheckCircle2 } from 'lucide-react';
-import { getProfile } from '@/data';
 import type { AccountStanding, TrustLayerInfo, FraudAlert, CollaborationReview } from '@/types';
 
 const standingTone: Record<AccountStanding, 'accent' | 'amber' | 'red'> = {
@@ -68,8 +67,9 @@ function FraudAlertRow({ alert }: { alert: FraudAlert }) {
 }
 
 function ReviewRow({ review }: { review: CollaborationReview }) {
-  const reviewer = getProfile(review.reviewerId);
-  const reviewee = getProfile(review.revieweeId);
+  const { profiles } = useApp();
+  const reviewer = profiles.find((profile) => profile.id === review.reviewerId);
+  const reviewee = profiles.find((profile) => profile.id === review.revieweeId);
   return (
     <div className="border border-ink-200 rounded-lg p-3">
       <div className="flex items-center justify-between gap-2">
