@@ -8,7 +8,10 @@ interface AuthContextValue {
   user: User | null;
   loading: boolean;
   isAdmin: boolean;
-  signUp: (email: string, password: string) => Promise<{ error: string | null }>;
+  signUp: (email: string, password: string) => Promise<{
+    error: string | null;
+    requiresConfirmation: boolean;
+  }>;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
 }
@@ -80,15 +83,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signUp = async (email: string, password: string) => {
     if (isE2EMode) {
-      if (!email.endsWith('@oppnets.test') || password.length < 6) {
-        return { error: 'Use an @oppnets.test address and a password of at least 6 characters in E2E mode.' };
+      if (!email.endsWith('@oppnets.test') || password.length < 8) {
+        return {
+          error: 'Use an @oppnets.test address and a password of at least 8 characters in E2E mode.',
+          requiresConfirmation: false,
+        };
       }
-      window.localStorage.setItem(E2E_AUTH_STORAGE_KEY, 'true');
-      setSession(createE2ESession());
-      return { error: null };
+      return { error: null, requiresConfirmation: true };
     }
-    const { error } = await supabase.auth.signUp({ email, password });
-    return { error: error?.message ?? null };
+    const { data, error } = await supabase.auth.signUp({ email, password });
+    return {
+      error: error?.message ?? null,
+      requiresConfirmation: !error && data.session === null,
+    };
   };
 
   const signIn = async (email: string, password: string) => {

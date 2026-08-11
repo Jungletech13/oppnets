@@ -24,14 +24,19 @@ test.describe('authentication bot', () => {
     await expect(page.getByText('Invalid E2E test credentials.')).toBeVisible();
   });
 
-  test('simulates a new user signup and reaches the landing experience', async ({ page }) => {
+  test('simulates a new user signup and explains email confirmation', async ({ page }) => {
     await page.goto('/');
     await page.getByRole('button', { name: 'Sign Up', exact: true }).first().click();
     await page.getByLabel('Email').fill('new.user@oppnets.test');
     await page.getByLabel('Password').fill('OppNetsTest1!');
     await page.getByRole('button', { name: 'Create Account' }).click();
 
-    await expect(page.getByRole('heading', { name: 'Every connection should lead to an opportunity.' })).toBeVisible();
+    await expect(page.getByRole('status')).toHaveText(
+      'Check your email for a confirmation link, then return here to sign in.',
+    );
+    await expect(page.getByRole('button', { name: 'Sign In', exact: true }).first()).toHaveClass(/bg-brand-600/);
+    await expect(page.getByLabel('Email')).toHaveValue('new.user@oppnets.test');
+    await expect(page.getByLabel('Password')).toHaveValue('');
   });
 
   test('simulates returning-user login and logout', async ({ page }) => {
