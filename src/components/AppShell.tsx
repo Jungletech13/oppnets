@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import {
-  Home, Compass, Users, Briefcase, LayoutDashboard, MessageSquare, Bell, User, Shield, Settings,
+  Home, Compass, Users, Briefcase, MessageSquare, Bell, User, Shield, Settings,
   Menu, X, Plus, Store, Building2, Wrench, DollarSign, Trophy, BookOpen,
 } from 'lucide-react';
 import { useApp, type Route } from '@/store';
@@ -11,14 +11,13 @@ const NAV: { label: string; route: Route; icon: typeof Home }[] = [
   { label: 'Discover Opportunities', route: { name: 'discover' }, icon: Compass },
   { label: 'People and Teams', route: { name: 'people' }, icon: Users },
   { label: 'My Opportunities', route: { name: 'my-opportunities' }, icon: Briefcase },
-  { label: 'Collaboration Spaces', route: { name: 'space', spaceId: 'cs-flip' }, icon: LayoutDashboard },
   { label: 'Messages', route: { name: 'messages' }, icon: MessageSquare },
   { label: 'Notifications', route: { name: 'notifications' }, icon: Bell },
   { label: 'Profile', route: { name: 'profile' }, icon: User },
   { label: 'Trust Center', route: { name: 'trust' }, icon: Shield },
   { label: 'Professionals', route: { name: 'professionals' }, icon: Store },
   { label: 'Companies', route: { name: 'companies' }, icon: Building2 },
-  { label: 'Builder Partners', route: { name: 'partners' }, icon: Wrench },
+  { label: 'Builder Resources', route: { name: 'partners' }, icon: Wrench },
   { label: 'Success Stories', route: { name: 'success-stories' }, icon: Trophy },
   { label: 'Resource Center', route: { name: 'resources' }, icon: BookOpen },
   { label: 'Pricing', route: { name: 'pricing' }, icon: DollarSign },
